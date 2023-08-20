@@ -10,57 +10,206 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
+from typing import List
+import rclpy
+from rclpy.clock import Clock, Time
+from rclpy.node import Node
 
-from typing import Callable, List
+from builtin_interfaces.msg import Duration
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from .profile import TransientVariableProfile
-
-# local
-from .control import BodyMotionCommand, DriveModuleMotionCommand, InvalidMotionCommandException, MotionCommand
-from .control_model import difference_between_angles, SimpleFourWheelSteeringControlModel
-from .control_profile import BodyMotionProfile, DriveModuleStateProfile
+from .control import BodyMotionCommand
 from .drive_module import DriveModule
-from .states import BodyState, DriveModuleDesiredValues, DriveModuleMeasuredValues
+from .geometry import Point
+from .profile import SingleVariableSCurveProfile, TransientVariableProfile
+from .states import DriveModuleMeasuredValues
+from .steering_controller import DriveModuleDesiredValuesProfilePoint, ModuleFollowsBodySteeringController
 
-class DriveModuleDesiredValuesProfilePoint():
+class SwerveController(Node):
+    def __init__(self):
+        super().__init__("publisher_velocity_controller")
+        # Declare all parameters
+        self.declare_parameter("twist_topic", "cmd_vel")
 
-    def __init__(self, time: float, drive_module_states: List[DriveModuleDesiredValues]):
-        self.time = time
-        self.drive_module_states = drive_module_states
+        self.declare_parameter("position_controller_name", "position_controller")
+        self.declare_parameter("velocity_controller_name", "velocity_controller")
+        self.declare_parameter("cycle_fequency", 50)
 
-class ModuleFollowsBodySteeringController():
+        self.declare_parameter("steering_joints", [])
+        self.declare_parameter("drive_joints", [])
 
-    def __init__(
-            self,
-            drive_modules: List[DriveModule],
-            motion_profile_func: Callable[[float, float], TransientVariableProfile]):
-        # Get the geometry for the robot
-        self.modules = drive_modules
-        self.motion_profile_func = motion_profile_func
+        # publish the module steering angle
+        position_controller_name = self.get_parameter("position_controller_name").value
+        steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
+        self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic, 1)
 
-        # Use a simple control model for the time being. Just need something that roughly works
-        self.control_model = SimpleFourWheelSteeringControlModel(self.modules)
-
-        # Store the current (estimated) state of the body
-        self.body_state: BodyState = BodyState(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
+        self.get_logger().info(
+            f'Publishing steering angle changes on topic "{steering_angle_publish_topic}"'
         )
 
-        # Store the current (measured) state of the drive modules
-        self.module_states: List[DriveModuleMeasuredValues] = [
-            DriveModuleMeasuredValues(
+        # publish the module drive velocity
+        velocity_controller_name = self.get_parameter("velocity_controller_name").value
+        velocity_publish_topic = "/" + velocity_controller_name + "/" + "commands"
+        self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic, 1)
+
+        self.get_logger().info(
+            f'Publishing drive velocity changes on topic "{velocity_publish_topic}"'
+        )
+
+        # Create the controller that will determine the correct drive commands for the different drive modules
+        # Create the controller before we subscribe to state changes so that the first change that comes in gets
+        # registered
+        self.drive_modules = self.get_drive_modules()
+        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile)
+
+        # Create the timer that is used to ensure that we publish movement data regularly
+        cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
+        self.timer = self.create_timer(1.0 / cycle_time_in_hertz, self.timer_callback)
+        self.i = 0
+
+        # Listen for state changes in the drive modules
+        self.state_change_subscription = self.create_subscription(
+            JointState,
+            "joint_states",
+            self.joint_states_callback,
+            10
+        )
+
+        # Initialize the drive modules
+        self.last_drive_module_state = self.initialize_drive_module_states()
+
+        # Finally listen to the cmd_vel topic for movement commands. We could have a message incoming
+        # at any point after we register so we set this subscription up last.
+        twist_topic = self.get_parameter("twist_topic").value
+        self.cmd_vel_subscription = self.create_subscription(
+            Twist,
+            twist_topic,
+            self.cmd_vel_callback,
+            10)
+        self.get_logger().info(
+            f'Listening for movement commands on topic "{twist_topic}"'
+        )
+
+    def cmd_vel_callback(self, msg: Twist):
+        if msg == None:
+            return
+
+        self.update_controller_time()
+        self.controller.on_desired_state_update(
+            BodyMotionCommand(
+                2.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
+                msg.linear.x,
+                msg.linear.y,
+                msg.angular.z
+            )
+        )
+
+    def get_drive_modules(self) -> List[DriveModule]:
+        # Get the drive module information from the URDF and turn it into a list of drive modules.
+        #
+        # For now we don't read the URDF and just hard-code the drive modules
+        robot_length = 0.35
+        robot_width = 0.32
+
+        steering_radius = 0.05
+
+        wheel_radius = 0.04
+        wheel_width = 0.05
+
+        # store the steering joints
+        steering_joint_names = self.get_parameter("steering_joints")
+        steering_joints = []
+        for name in steering_joint_names:
+            steering_joints.append(name)
+
+        # store the drive joints
+        drive_joint_names = self.get_parameter("drive_joints")
+        drive_joints = []
+        for name in drive_joint_names:
+            drive_joints.append(name)
+
+        drive_modules: List[DriveModule] = []
+        drive_module_name = "left_front"
+        left_front = DriveModule(
+            name=drive_module_name,
+            steering_link=next((x for x in steering_joints if drive_module_name in x), "joint_steering_{}".format(drive_module_name)),
+            drive_link=next((x for x in drive_joints if drive_module_name in x), "joint_drive_{}".format(drive_module_name)),
+            steering_axis_xy_position=Point(0.5 * (robot_length - 2 * wheel_radius), 0.5 * (robot_width - steering_radius), 0.0),
+            wheel_radius=wheel_radius,
+            wheel_width=wheel_width,
+            steering_motor_maximum_velocity=10.0,
+            steering_motor_minimum_acceleration=0.1,
+            steering_motor_maximum_acceleration=1.0,
+            drive_motor_maximum_velocity=10.0,
+            drive_motor_minimum_acceleration=0.1,
+            drive_motor_maximum_acceleration=1.0
+        )
+        drive_modules.append(left_front)
+
+        drive_module_name = "left_rear"
+        left_rear = DriveModule(
+            name=drive_module_name,
+            steering_link=next((x for x in steering_joints if drive_module_name in x), "joint_steering_{}".format(drive_module_name)),
+            drive_link=next((x for x in drive_joints if drive_module_name in x), "joint_drive_{}".format(drive_module_name)),
+            steering_axis_xy_position=Point(-0.5 * (robot_length - 2 * wheel_radius), 0.5 * (robot_width - steering_radius), 0.0),
+            wheel_radius=wheel_radius,
+            wheel_width=wheel_width,
+            steering_motor_maximum_velocity=10.0,
+            steering_motor_minimum_acceleration=0.1,
+            steering_motor_maximum_acceleration=1.0,
+            drive_motor_maximum_velocity=10.0,
+            drive_motor_minimum_acceleration=0.1,
+            drive_motor_maximum_acceleration=1.0
+        )
+        drive_modules.append(left_rear)
+
+        drive_module_name = "right_rear"
+        right_rear = DriveModule(
+            name=drive_module_name,
+            steering_link=next((x for x in steering_joints if drive_module_name in x), "joint_steering_{}".format(drive_module_name)),
+            drive_link=next((x for x in drive_joints if drive_module_name in x), "joint_drive_{}".format(drive_module_name)),
+            steering_axis_xy_position=Point(-0.5 * (robot_length - 2 * wheel_radius), -0.5 * (robot_width - steering_radius), 0.0),
+            wheel_radius=wheel_radius,
+            wheel_width=wheel_width,
+            steering_motor_maximum_velocity=10.0,
+            steering_motor_minimum_acceleration=0.1,
+            steering_motor_maximum_acceleration=1.0,
+            drive_motor_maximum_velocity=10.0,
+            drive_motor_minimum_acceleration=0.1,
+            drive_motor_maximum_acceleration=1.0
+        )
+        drive_modules.append(right_rear)
+
+        drive_module_name = "right_front"
+        right_front = DriveModule(
+            name=drive_module_name,
+            steering_link=next((x for x in steering_joints if drive_module_name in x), "joint_steering_{}".format(drive_module_name)),
+            drive_link=next((x for x in drive_joints if drive_module_name in x), "joint_drive_{}".format(drive_module_name)),
+            steering_axis_xy_position=Point(0.5 * (robot_length - 2 * wheel_radius), -0.5 * (robot_width - steering_radius), 0.0),
+            wheel_radius=wheel_radius,
+            wheel_width=wheel_width,
+            steering_motor_maximum_velocity=10.0,
+            steering_motor_minimum_acceleration=0.1,
+            steering_motor_maximum_acceleration=1.0,
+            drive_motor_maximum_velocity=10.0,
+            drive_motor_minimum_acceleration=0.1,
+            drive_motor_maximum_acceleration=1.0
+        )
+        drive_modules.append(right_front)
+
+        return drive_modules
+
+    def get_scurve_profile(self, start: float, end: float) -> TransientVariableProfile:
+        return SingleVariableSCurveProfile(start, end)
+
+    def initialize_drive_module_states(self, drive_modules: List[DriveModule]) -> List[DriveModuleMeasuredValues]:
+        measured_drive_states: List[DriveModuleMeasuredValues] = []
+        for drive_module in self.drive_modules:
+
+            value = DriveModuleMeasuredValues(
                 drive_module.name,
                 drive_module.steering_axis_xy_position.x,
                 drive_module.steering_axis_xy_position.y,
@@ -71,253 +220,103 @@ class ModuleFollowsBodySteeringController():
                 0.0,
                 0.0,
                 0.0
-            ) for drive_module in drive_modules
-        ]
+            )
+            measured_drive_states.append(value)
 
-        self.previous_module_states: List[DriveModuleMeasuredValues] = [
-            DriveModuleMeasuredValues(
-                drive_module.name,
-                drive_module.steering_axis_xy_position.x,
-                drive_module.steering_axis_xy_position.y,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0
-            ) for drive_module in drive_modules
-        ]
+        self.update_controller_time()
+        self.controller.on_state_update(measured_drive_states)
 
-        # Profiles
-        self.body_profile: BodyMotionProfile = None
-        self.module_profile_from_command: DriveModuleStateProfile = None
+        return measured_drive_states
 
-         # Keep track of our position in time so that we can figure out where on the current
-        # profile we should be
-        self.current_time_in_seconds = 0.0
-        self.profile_was_started_at_time_in_seconds = 0.0
-        self.last_state_update_time = 0.0
-        self.min_time_for_profile: float = 0.0
+    def joint_states_callback(self, msg: JointState):
+        if msg == None:
+            return
 
-        # flags
-        self.is_executing_body_profile: bool = False
-        self.is_executing_module_profile: bool = False
+        joint_names: List[str] = msg.name
+        joint_positions: List[float] = [pos for pos in msg.position]
+        joint_velocities: List[float] = [vel for vel in msg.velocity]
 
-    def body_state_at_current_time(self) -> BodyState:
-        return self.body_state
+        measured_drive_states: List[DriveModuleMeasuredValues] = []
+        for index, drive_module in enumerate(self.drive_modules):
+            if drive_module.steering_link_name in joint_names and drive_module.driving_link_name in joint_names:
+                steering_values_index = joint_names.index(drive_module.steering_link_name)
+                drive_values_index = joint_names.index(drive_module.driving_link_name)
 
-    def drive_module_states_at_current_time(self) -> List[DriveModuleMeasuredValues]:
-        return self.module_states
-
-    def drive_module_state_at_profile_time(self, time_fraction: float) -> List[DriveModuleDesiredValues]:
-        result: List[DriveModuleDesiredValues] = []
-        if self.is_executing_body_profile:
-            body_state = self.body_profile.body_motion_at(time_fraction)
-            drive_module_desired_values = self.control_model.state_of_wheel_modules_from_body_motion(body_state)
-            for i in range(len(self.modules)):
-                # Wheels are moving. We don't know what kind of movement yet though, so figure out if:
-                # - The wheel are moving at some significant velocity, in that case pick the state that most
-                #   closely matches the current state, i.e. match the drive velocity and the steering angle as
-                #   close as possible
-                # - The wheel is moving slowly, in that case we may just be close to the moment where the wheel
-                #   stops moving (either just before it does that, or just after). This is where we could potentially
-                #   flip directions (or we might just have flipped directions)
-                #   - If we have just flipped directions then we should probably continue in the same way (but maybe not)
-
-                #previous_state_for_module = self.previous_module_states[i]
-
-                current_state_for_module = self.module_states[i]
-                current_steering_angle = current_state_for_module.orientation_in_body_coordinates.z
-                current_velocity = current_state_for_module.drive_velocity_in_module_coordinates.x
-
-                #previous_rotation_difference = current_steering_angle - previous_state_for_module.orientation_in_body_coordinates.z
-                #previous_velocity_difference = current_velocity - previous_state_for_module.drive_velocity_in_module_coordinates.x
-
-                states_for_module = drive_module_desired_values[i]
-
-                first_state_rotation_difference = difference_between_angles(current_steering_angle, states_for_module[0].steering_angle_in_radians)
-                second_state_rotation_difference = difference_between_angles(current_steering_angle, states_for_module[1].steering_angle_in_radians)
-
-                first_state_velocity_difference = states_for_module[0].drive_velocity_in_meters_per_second - current_velocity
-                second_state_velocity_difference = states_for_module[1].drive_velocity_in_meters_per_second - current_velocity
-
-                # Possibilities:
-                # - first velocity change and first orientation change are the smallest -> pick the first state
-                # - second velocity change and second orientation change are the smallest -> pick the second state
-                # - first velocity change is larger and second orientation change is larger -> Bad state. Pick the one with the least relative change?
-
-                if abs(first_state_rotation_difference) <= abs(second_state_rotation_difference):
-                    if abs(first_state_velocity_difference) <= abs(second_state_velocity_difference):
-                        # first rotation and velocity change are the smallest, so take the first state
-                        result.append(states_for_module[0])
-                    else:
-                        if math.isclose(abs(first_state_rotation_difference), abs(second_state_rotation_difference), rel_tol=1e-7, abs_tol=1e-7):
-                            # first rotation is equal to the second rotation
-                            # first velocity larger than the second velocity.
-                            # pick the second state
-                            result.append(states_for_module[1])
-                        else:
-                            # first rotation is the smallest but second velocity is the smallest
-                            result.append(states_for_module[0])
-                else:
-                    if abs(second_state_velocity_difference) <= abs(first_state_velocity_difference):
-                        # second rotation and velocity change are the smallest, so take the second state
-                        result.append(states_for_module[1])
-                    else:
-                        if math.isclose(abs(first_state_rotation_difference), abs(second_state_rotation_difference), rel_tol=1e-7, abs_tol=1e-7):
-                            # second rotation is equal to the first rotation
-                            # second velocity larger than the first velocity.
-                            # pick the first state
-                            result.append(states_for_module[0])
-                        else:
-                            # second rotation is the smallest but first velocity is the smallest
-                            result.append(states_for_module[1])
-        else:
-            for drive_module in self.modules:
-                state = self.module_profile_from_command.value_for_module_at(drive_module.name, time_fraction)
-                result.append(DriveModuleDesiredValues(
-                    state.name,
-                    state.orientation_in_body_coordinates.z,
-                    state.drive_velocity_in_module_coordinates.x
-                ))
-
-        return result
-
-    # Returns the state of the drive modules to required to match the current profile at the given
-    # time.
-    def drive_module_state_at_future_time(self, future_time_in_seconds:float) -> List[DriveModuleDesiredValues]:
-        time_from_start_of_profile = future_time_in_seconds - self.profile_was_started_at_time_in_seconds
-
-        profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
-        time_fraction = time_from_start_of_profile / profile_time
-
-        result: List[DriveModuleDesiredValues] = self.drive_module_state_at_profile_time(time_fraction)
-        return result
-
-    def drive_module_profile_points_from_now_till_end(self, starting_time: float) -> List[DriveModuleDesiredValuesProfilePoint]:
-        # for now distribute the points equally. But really what we should be doing is putting more points in
-        # places where the second or third derivatives change sign
-
-        time_from_start_of_profile = starting_time - self.profile_was_started_at_time_in_seconds
-
-        profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
-        time_fraction_start = time_from_start_of_profile / profile_time
-        time_fraction_end = 1.0
-
-        # Take time steps of 1/100 of the total profile time. Find the next time step we should take and
-        # then find the number of steps we have left to take in the current
-        next_time_step = self.round_up(time_fraction_start, 0.01)
-
-        result: List[DriveModuleDesiredValuesProfilePoint] = []
-        for step in range(next_time_step, time_fraction_end, 0.01):
-            time = profile_time * step + self.profile_was_started_at_time_in_seconds
-            states = self.drive_module_state_at_profile_time(step)
-
-            point = DriveModuleDesiredValuesProfilePoint(time, states)
-            result.append(point)
-
-        return result
-
-    # Updates the currently stored desired body state. On the next time tick the
-    # drive module trajectory will be updated to match the new desired end state.
-    def on_desired_state_update(self, desired_motion: MotionCommand):
-        if isinstance(desired_motion, BodyMotionCommand):
-            trajectory = BodyMotionProfile(
-                self.body_state,
-                desired_motion.to_body_state(self.control_model),
-                desired_motion.time_for_motion(),
-                self.motion_profile_func)
-            self.body_profile = trajectory
-
-            self.is_executing_body_profile = True
-            self.is_executing_module_profile = False
-        else:
-            if isinstance(desired_motion, DriveModuleMotionCommand):
-                trajectory = DriveModuleStateProfile(self.modules, desired_motion.time_for_motion(), self.motion_profile_func)
-                trajectory.set_current_state(self.module_states)
-                trajectory.set_desired_end_state(desired_motion.to_drive_module_state(self.control_model)[0])
-                self.module_profile_from_command = trajectory
-
-                self.is_executing_body_profile = False
-                self.is_executing_module_profile = True
+                value = DriveModuleMeasuredValues(
+                    drive_module.name,
+                    drive_module.steering_axis_xy_position.x,
+                    drive_module.steering_axis_xy_position.y,
+                    joint_positions[steering_values_index],
+                    joint_velocities[steering_values_index],
+                    0.0,
+                    0.0,
+                    joint_velocities[drive_values_index],
+                    0.0,
+                    0.0
+                )
+                measured_drive_states.append(value)
             else:
-                raise InvalidMotionCommandException()
+                # grab the previous state and just assume that's the one
+                value = self.last_drive_module_state[index]
+                measured_drive_states.append(value)
 
-        self.profile_was_started_at_time_in_seconds = self.current_time_in_seconds
-        self.min_time_for_profile = desired_motion.time_for_motion()
+        self.update_controller_time()
+        self.controller.on_state_update(measured_drive_states)
+        self.last_drive_module_state = measured_drive_states
 
-    # Updates the currently stored drive module state
-    def on_state_update(self, current_module_states: List[DriveModuleMeasuredValues]):
-        if current_module_states is None:
-            raise TypeError()
+    def timer_callback(self):
+        self.update_controller_time()
 
-        if len(current_module_states) != len(self.modules):
-            raise ValueError()
+        # Technically we only need to send updates if:
+        # - The desired end-state has changed
+        # - The current state doesn't match the trajectory
+        time: Time = self.get_clock().now()
+        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
 
-        self.previous_module_states = self.module_states
-        self.module_states = current_module_states
+        steering_angle_points: List[JointTrajectoryPoint] = []
+        drive_velocity_points: List[JointTrajectoryPoint] = []
+        for desired_value in points:
 
-         # Calculate the current body state
-        body_motion = self.control_model.body_motion_from_wheel_module_states(self.module_states)
+            steering_angle = JointTrajectoryPoint()
+            steering_angle.positions = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
+            steering_angle.time_from_start = Duration(sec=desired_value.time)
+            steering_angle_points.append(steering_angle)
 
-        time_step_in_seconds = self.current_time_in_seconds - self.last_state_update_time
-        # Position
-        local_x_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.x + body_motion.linear_velocity.x)
-        local_y_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.y + body_motion.linear_velocity.y)
-        # Orientation
-        global_orientation = self.body_state.orientation_in_world_coordinates.z + time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.angular_velocity.z + body_motion.angular_velocity.z)
+            drive_velocity = JointTrajectoryPoint()
+            drive_velocity.velocities = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
+            drive_velocity.time_from_start = Duration(sec=desired_value.time)
+            drive_velocity_points.append(drive_velocity)
 
-        # Acceleration
-        local_x_acceleration = 0.0
-        local_y_acceleration = 0.0
-        orientation_acceleration = 0.0
-        if not math.isclose(time_step_in_seconds, 0.0, abs_tol=1e-4, rel_tol=1e-4):
-            local_x_acceleration = (body_motion.linear_velocity.x - self.body_state.motion_in_body_coordinates.linear_velocity.x) / time_step_in_seconds
-            local_y_acceleration = (body_motion.linear_velocity.y - self.body_state.motion_in_body_coordinates.linear_velocity.y) / time_step_in_seconds
-            orientation_acceleration = (body_motion.angular_velocity.z - self.body_state.motion_in_body_coordinates.angular_velocity.z) / time_step_in_seconds
+        position_msg = JointTrajectory()
+        position_msg.joint_names = (x.steering_link_name for x in self.drive_modules) # we can probably optimze this away, at some point
+        position_msg.points.extend(steering_angle_points)
 
-        # Jerk
-        local_x_jerk = 0.0
-        local_y_jerk = 0.0
-        orientation_jerk = 0.0
-        if not math.isclose(time_step_in_seconds, 0.0, abs_tol=1e-4, rel_tol=1e-4):
-            local_x_jerk = (local_x_acceleration - self.body_state.motion_in_body_coordinates.linear_acceleration.x) / time_step_in_seconds
-            local_y_jerk = (local_y_acceleration - self.body_state.motion_in_body_coordinates.linear_acceleration.y) / time_step_in_seconds
-            orientation_jerk = (orientation_acceleration - self.body_state.motion_in_body_coordinates.angular_acceleration.z) / time_step_in_seconds
+        velocity_msg = JointTrajectory()
+        velocity_msg.joint_names = (x.driving_link_name for x in self.drive_modules)
+        velocity_msg.points.extend(drive_velocity_points)
 
-        self.body_state = BodyState(
-            self.body_state.position_in_world_coordinates.x + local_x_distance * math.cos(global_orientation) - local_y_distance * math.sin(global_orientation),
-            self. body_state.position_in_world_coordinates.y + local_x_distance * math.sin(global_orientation) + local_y_distance * math.cos(global_orientation),
-            global_orientation,
-            body_motion.linear_velocity.x,
-            body_motion.linear_velocity.y,
-            body_motion.angular_velocity.z,
-            local_x_acceleration,
-            local_y_acceleration,
-            orientation_acceleration,
-            local_x_jerk,
-            local_y_jerk,
-            orientation_jerk
-        )
+        # Publish the next steering angle and the next velocity sets. Note that
+        # The velocity is published (very) shortly after the position data, which means
+        # that the velocity could lag in very tight update loops.
+        self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
+        self.drive_module_steering_angle_publisher.publish(position_msg)
 
-        self.last_state_update_time = self.current_time_in_seconds
+        self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
+        self.drive_module_velocity_publisher.publish(velocity_msg)
 
-    # On clock tick, determine if we need to recalculate the trajectories for the drive modules
-    def on_tick(self, current_time_in_seconds: float):
-        self.current_time_in_seconds = current_time_in_seconds
+    def update_controller_time(self):
+        time: Time = self.get_clock().now()
+        seconds = time.nanoseconds * 1e-9
+        self.controller.on_tick(seconds)
 
-    def round_down(self, num: float, to: float) -> float:
-        if num < 0:
-            return -self.round_up(-num, to)
-        mod = math.fmod(num, to)
+def main(args=None):
+    rclpy.init(args=args)
 
-        return num if math.isclose(mod, to) else num - mod
+    pub = SwerveController()
 
-    def round_up(self, num: float, to: float) -> float:
-        if num < 0:
-            return -self.round_down(-num, to)
+    rclpy.spin(pub)
+    pub.destroy_node()
+    rclpy.shutdown()
 
-        down = self.round_down(num, to)
-
-        return num if num == down else down + to
+if __name__ == "__main__":
+    main()
