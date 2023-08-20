@@ -12,6 +12,7 @@
 
 from typing import List
 import rclpy
+from rclpy.clock import Clock, Time
 from rclpy.node import Node
 
 from builtin_interfaces.msg import Duration
@@ -96,6 +97,7 @@ class Controller(Node):
         if msg == None:
             return
 
+        self.update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
                 2.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
@@ -221,6 +223,7 @@ class Controller(Node):
             )
             measured_drive_states.append(value)
 
+        self.update_controller_time()
         self.controller.on_state_update(measured_drive_states)
 
         return measured_drive_states
@@ -257,16 +260,18 @@ class Controller(Node):
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
+        self.update_controller_time()
         self.controller.on_state_update(measured_drive_states)
         self.last_drive_module_state = measured_drive_states
 
     def timer_callback(self):
+        self.update_controller_time()
 
         # Technically we only need to send updates if:
         # - The desired end-state has changed
         # - The current state doesn't match the trajectory
-
-        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_trajectory_points_from_now_till_end(current_time) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
+        time: Time = self.get_clock().now()
+        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
 
         steering_angle_points: List[JointTrajectoryPoint] = []
         drive_velocity_points: List[JointTrajectoryPoint] = []
@@ -299,6 +304,11 @@ class Controller(Node):
         self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
+    def update_controller_time(self):
+        time: Time = self.get_clock().now()
+        seconds = time.nanoseconds * 1e-9
+        self.controller.on_tick(seconds)
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -307,7 +317,6 @@ def main(args=None):
     rclpy.spin(pub)
     pub.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
