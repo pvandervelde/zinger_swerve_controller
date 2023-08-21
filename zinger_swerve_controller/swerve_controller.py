@@ -14,12 +14,16 @@ from typing import List
 import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.node import Node
+from tf2_geometry_msgs import TransformStamped
 
 from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+from tf_transformations import quaternion_from_euler
 
 from .control import BodyMotionCommand
 from .drive_module import DriveModule
@@ -58,6 +62,10 @@ class SwerveController(Node):
         self.get_logger().info(
             f'Publishing drive velocity changes on topic "{velocity_publish_topic}"'
         )
+
+        # publish odometry
+        odom_topic = "/odom"
+        self.odometry_publisher = self.create_publisher(Odometry, odom_topic, 1)
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
@@ -232,6 +240,9 @@ class SwerveController(Node):
         if msg == None:
             return
 
+        # It would be better if we stored this message and processed it during our own timer loop. That way
+        # we wouldn't be blocking the callback.
+
         joint_names: List[str] = msg.name
         joint_positions: List[float] = [pos for pos in msg.position]
         joint_velocities: List[float] = [vel for vel in msg.velocity]
@@ -260,12 +271,44 @@ class SwerveController(Node):
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
+        # Ideally we would get the time from the message. And then check if we have gotten a more
+        # recent message
         self.update_controller_time()
         self.controller.on_state_update(measured_drive_states)
         self.last_drive_module_state = measured_drive_states
 
+    def publish_odometry(self):
+        body_state = self.controller.body_state_at_current_time()
+
+        msg = Odometry()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.pose.pose.position.x = body_state.position_in_world_coordinates.x
+        msg.pose.pose.position.y = body_state.position_in_world_coordinates.y
+        msg.pose.pose.position.z = body_state.position_in_world_coordinates.z
+
+        quat = quaternion_from_euler(0.0, 0.0, body_state.orientation_in_world_coordinates.z)
+        msg.pose.pose.orientation.x = quat[0]
+        msg.pose.pose.orientation.y = quat[1]
+        msg.pose.pose.orientation.z = quat[2]
+        msg.pose.pose.orientation.w = quat[3]
+
+        msg.twist.twist.linear.x = body_state.motion_in_body_coordinates.linear_velocity.x
+        msg.twist.twist.linear.y = body_state.motion_in_body_coordinates.linear_velocity.y
+        msg.twist.twist.linear.z = body_state.motion_in_body_coordinates.linear_velocity.z
+
+        msg.twist.twist.angular.x = body_state.motion_in_body_coordinates.angular_velocity.x
+        msg.twist.twist.angular.y = body_state.motion_in_body_coordinates.angular_velocity.y
+        msg.twist.twist.angular.z = body_state.motion_in_body_coordinates.angular_velocity.z
+
+        # For now we ignore the covariances
+
+        self.odometry_publisher.publish(msg)
+
     def timer_callback(self):
         self.update_controller_time()
+
+        # send out Odom
+        self.publish_odometry()
 
         # Technically we only need to send updates if:
         # - The desired end-state has changed
