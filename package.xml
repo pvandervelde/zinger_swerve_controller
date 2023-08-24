@@ -7,20 +7,15 @@
   <maintainer email="petrikvandervelde@gmail.com">petrik</maintainer>
   <license>Apache-2.0</license>
 
-  <build_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>trajectory_msgs</exec_depend>
-  <exec_depend>tf_transformations</exec_depend>
+  <!-- Messages -->
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>tf_transformations</depend>
 
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>trajectory_msgs</exec_depend>
-  <exec_depend>tf_transformations</exec_depend>
-
+  <!-- test dependencies -->
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>
 
