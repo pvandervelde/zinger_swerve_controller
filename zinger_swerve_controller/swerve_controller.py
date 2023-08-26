@@ -48,11 +48,6 @@ class SwerveController(Node):
 
         self.get_logger().info(f'Initializing swerve controller ...')
 
-        # time tracking variables
-        self.store_time_and_update_controller_time()
-        self.last_control_update_send_at = self.last_recorded_time
-        self.last_velocity_command_received_at = self.last_recorded_time
-
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
         steering_angle_publish_topic = "/" + position_controller_name + "/" + "joint_trajectory"
@@ -84,6 +79,12 @@ class SwerveController(Node):
         self.get_logger().info(f'Storing drive module information...')
         self.drive_modules = self.get_drive_modules()
         self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile)
+
+        # initialize the time tracking variables after we get the controller up and running
+        # so that we can initialize the controller at the same time.
+        self.store_time_and_update_controller_time()
+        self.last_control_update_send_at = self.last_recorded_time
+        self.last_velocity_command_received_at = self.last_recorded_time
 
         # Create the timer that is used to ensure that we publish movement data regularly
         cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
