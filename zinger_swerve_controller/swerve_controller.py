@@ -50,7 +50,7 @@ class SwerveController(Node):
 
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
-        steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
+        steering_angle_publish_topic = "/" + position_controller_name + "/" + "joint_trajectory"
         self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic, 1)
 
         self.get_logger().info(
@@ -59,7 +59,7 @@ class SwerveController(Node):
 
         # publish the module drive velocity
         velocity_controller_name = self.get_parameter("velocity_controller_name").value
-        velocity_publish_topic = "/" + velocity_controller_name + "/" + "commands"
+        velocity_publish_topic = "/" + velocity_controller_name + "/" + "joint_trajectory"
         self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic, 1)
 
         self.get_logger().info(
