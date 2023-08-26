@@ -42,8 +42,8 @@ class SwerveController(Node):
         self.declare_parameter("velocity_controller_name", "velocity_controller")
         self.declare_parameter("cycle_fequency", 50)
 
-        self.declare_parameter("steering_joints", [])
-        self.declare_parameter("drive_joints", [])
+        self.declare_parameter("steering_joints", ["joint1", "joint2"])
+        self.declare_parameter("drive_joints", ["joint1", "joint2"])
 
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
