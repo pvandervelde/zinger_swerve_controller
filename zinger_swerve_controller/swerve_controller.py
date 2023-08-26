@@ -415,12 +415,12 @@ class SwerveController(Node):
 
         steering_joint_names = [x.steering_link_name for x in self.drive_modules]
         position_msg = JointTrajectory()
-        position_msg.header.stamp = self.last_recorded_time.to_msg()
+        #position_msg.header.stamp = self.last_recorded_time.to_msg()
         position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
 
         drive_joint_names = [x.driving_link_name for x in self.drive_modules]
         velocity_msg = JointTrajectory()
-        velocity_msg.header.stamp = self.last_recorded_time.to_msg()
+        #velocity_msg.header.stamp = self.last_recorded_time.to_msg()
         velocity_msg.joint_names = drive_joint_names
 
         for desired_value in points:
