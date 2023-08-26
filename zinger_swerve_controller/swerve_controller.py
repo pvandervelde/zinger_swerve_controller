@@ -48,6 +48,11 @@ class SwerveController(Node):
 
         self.get_logger().info(f'Initializing swerve controller ...')
 
+        # time tracking variables
+        self.store_time_and_update_controller_time()
+        self.last_control_update_send_at = self.last_recorded_time
+        self.last_velocity_command_received_at = self.last_recorded_time
+
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
         steering_angle_publish_topic = "/" + position_controller_name + "/" + "joint_trajectory"
@@ -125,7 +130,7 @@ class SwerveController(Node):
             f'Received a Twist message: "{msg}"'
         )
 
-        self.update_controller_time()
+        self.store_time_and_update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
                 2.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
@@ -291,7 +296,7 @@ class SwerveController(Node):
                 f'Initializing drive module state for module: "{drive_module.name}"'
             )
 
-        self.update_controller_time()
+        self.store_time_and_update_controller_time()
         self.controller.on_state_update(measured_drive_states)
 
         return measured_drive_states
@@ -351,7 +356,7 @@ class SwerveController(Node):
 
         # Ideally we would get the time from the message. And then check if we have gotten a more
         # recent message
-        self.update_controller_time()
+        self.store_time_and_update_controller_time()
         self.controller.on_state_update(measured_drive_states)
         self.last_drive_module_state = measured_drive_states
 
@@ -382,8 +387,14 @@ class SwerveController(Node):
 
         self.odometry_publisher.publish(msg)
 
+    def store_time_and_update_controller_time(self):
+        time: Time = self.get_clock().now()
+        seconds = time.nanoseconds * 1e-9
+        self.controller.on_tick(seconds)
+        self.last_recorded_time = time
+
     def timer_callback(self):
-        self.update_controller_time()
+        self.store_time_and_update_controller_time()
 
         # send out Odom
         self.publish_odometry()
@@ -437,11 +448,7 @@ class SwerveController(Node):
 
         self.last_control_update_send_at = self.last_recorded_time
 
-    def update_controller_time(self):
-        time: Time = self.get_clock().now()
-        seconds = time.nanoseconds * 1e-9
-        self.controller.on_tick(seconds)
-        self.last_recorded_time = time
+
 
 def main(args=None):
     rclpy.init(args=args)
