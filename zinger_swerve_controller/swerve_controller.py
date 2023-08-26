@@ -131,6 +131,8 @@ class SwerveController(Node):
             )
         )
 
+        self.last_velocity_command_received_at = self.last_recorded_time
+
     def get_drive_modules(self) -> List[DriveModule]:
         # Get the drive module information from the URDF and turn it into a list of drive modules.
         #
@@ -381,6 +383,9 @@ class SwerveController(Node):
         # Technically we only need to send updates if:
         # - The desired end-state has changed
         # - The current state doesn't match the trajectory
+        if self.last_control_update_send_at > self.last_velocity_command_received_at:
+            return
+
         time: Time = self.get_clock().now()
         points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
 
@@ -422,10 +427,13 @@ class SwerveController(Node):
         self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
+        self.last_control_update_send_at = self.last_recorded_time
+
     def update_controller_time(self):
         time: Time = self.get_clock().now()
         seconds = time.nanoseconds * 1e-9
         self.controller.on_tick(seconds)
+        self.last_recorded_time = time
 
 def main(args=None):
     rclpy.init(args=args)
