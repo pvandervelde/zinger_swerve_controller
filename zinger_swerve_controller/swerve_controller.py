@@ -121,6 +121,10 @@ class SwerveController(Node):
         if msg == None:
             return
 
+        self.get_logger().debug(
+            f'Received a Twist message: "{msg}"'
+        )
+
         self.update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
@@ -295,6 +299,10 @@ class SwerveController(Node):
     def joint_states_callback(self, msg: JointState):
         if msg == None:
             return
+
+        self.get_logger().debug(
+            f'Received a JointState message: "{msg}"'
+        )
 
         # It would be better if we stored this message and processed it during our own timer loop. That way
         # we wouldn't be blocking the callback.
