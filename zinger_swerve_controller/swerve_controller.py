@@ -87,7 +87,7 @@ class SwerveController(Node):
         )
 
         # Initialize the drive modules
-        self.last_drive_module_state = self.initialize_drive_module_states()
+        self.last_drive_module_state = self.initialize_drive_module_states(self.drive_modules)
 
         # Finally listen to the cmd_vel topic for movement commands. We could have a message incoming
         # at any point after we register so we set this subscription up last.
