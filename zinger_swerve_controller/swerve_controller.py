@@ -399,12 +399,22 @@ class SwerveController(Node):
             drive_velocity.time_from_start = Duration(sec=desired_value.time)
             drive_velocity_points.append(drive_velocity)
 
+        steering_joint_names = [x.steering_link_name for x in self.drive_modules]
+        self.get_logger().debug(
+            f'Updating joint states for: "{steering_joint_names}"'
+        )
+
         position_msg = JointTrajectory()
-        position_msg.joint_names = (x.steering_link_name for x in self.drive_modules) # we can probably optimze this away, at some point
+        position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
         position_msg.points.extend(steering_angle_points)
 
+        drive_joint_names = [x.driving_link_name for x in self.drive_modules]
+        self.get_logger().debug(
+            f'Updating joint states for: "{drive_joint_names}"'
+        )
+
         velocity_msg = JointTrajectory()
-        velocity_msg.joint_names = (x.driving_link_name for x in self.drive_modules)
+        velocity_msg.joint_names = drive_joint_names
         velocity_msg.points.extend(drive_velocity_points)
 
         # Publish the next steering angle and the next velocity sets. Note that
