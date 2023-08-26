@@ -3,8 +3,8 @@ swerve_controller:
 
     twist_topic: cmd_vel
 
-    position_controller_name: ""
-    velocity_controller_name: ""
+    position_controller_name: "drive_module_steering_angle_controller"
+    velocity_controller_name: "drive_module_velocity_controller"
 
     cycle_fequency: 50
 
