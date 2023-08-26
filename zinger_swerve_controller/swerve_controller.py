@@ -128,13 +128,13 @@ class SwerveController(Node):
         wheel_width = 0.05
 
         # store the steering joints
-        steering_joint_names = self.get_parameter("steering_joints")
+        steering_joint_names = self.get_parameter("steering_joints").value
         steering_joints = []
         for name in steering_joint_names:
             steering_joints.append(name)
 
         # store the drive joints
-        drive_joint_names = self.get_parameter("drive_joints")
+        drive_joint_names = self.get_parameter("drive_joints").value
         drive_joints = []
         for name in drive_joint_names:
             drive_joints.append(name)
