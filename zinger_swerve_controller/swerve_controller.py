@@ -377,6 +377,16 @@ class SwerveController(Node):
         # send out Odom
         self.publish_odometry()
 
+        # Technically we only need to send updates if:
+        # - The desired end-state has changed
+        # - The current state doesn't match the trajectory
+        time: Time = self.get_clock().now()
+        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
+
+        # Only publish movement commands if there is a trajectory
+        if len(points) == 0:
+            return
+
         steering_joint_names = [x.steering_link_name for x in self.drive_modules]
         position_msg = JointTrajectory()
         position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
@@ -384,12 +394,6 @@ class SwerveController(Node):
         drive_joint_names = [x.driving_link_name for x in self.drive_modules]
         velocity_msg = JointTrajectory()
         velocity_msg.joint_names = drive_joint_names
-
-        # Technically we only need to send updates if:
-        # - The desired end-state has changed
-        # - The current state doesn't match the trajectory
-        time: Time = self.get_clock().now()
-        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
 
         for desired_value in points:
 
