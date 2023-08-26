@@ -187,6 +187,9 @@ class ModuleFollowsBodySteeringController():
     # Returns the state of the drive modules to required to match the current profile at the given
     # time.
     def drive_module_state_at_future_time(self, future_time_in_seconds:float) -> List[DriveModuleDesiredValues]:
+        if self.body_profile is None and self.module_profile_from_command is None:
+            return []
+
         time_from_start_of_profile = future_time_in_seconds - self.profile_was_started_at_time_in_seconds
 
         profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
@@ -196,6 +199,9 @@ class ModuleFollowsBodySteeringController():
         return result
 
     def drive_module_profile_points_from_now_till_end(self, starting_time: float) -> List[DriveModuleDesiredValuesProfilePoint]:
+        if self.body_profile is None and self.module_profile_from_command is None:
+            return []
+
         # for now distribute the points equally. But really what we should be doing is putting more points in
         # places where the second or third derivatives change sign
 
