@@ -365,7 +365,7 @@ class SwerveController(Node):
         body_state = self.controller.body_state_at_current_time()
 
         msg = Odometry()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = self.last_recorded_time
         msg.pose.pose.position.x = body_state.position_in_world_coordinates.x
         msg.pose.pose.position.y = body_state.position_in_world_coordinates.y
         msg.pose.pose.position.z = body_state.position_in_world_coordinates.z
@@ -415,10 +415,12 @@ class SwerveController(Node):
 
         steering_joint_names = [x.steering_link_name for x in self.drive_modules]
         position_msg = JointTrajectory()
+        position_msg.header.stamp = self.last_recorded_time
         position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
 
         drive_joint_names = [x.driving_link_name for x in self.drive_modules]
         velocity_msg = JointTrajectory()
+        velocity_msg.header.stamp = self.last_recorded_time
         velocity_msg.joint_names = drive_joint_names
 
         for desired_value in points:
