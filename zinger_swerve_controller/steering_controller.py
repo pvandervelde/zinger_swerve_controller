@@ -26,7 +26,7 @@ from .states import BodyState, DriveModuleDesiredValues, DriveModuleMeasuredValu
 class DriveModuleDesiredValuesProfilePoint():
 
     def __init__(self, time: float, drive_module_states: List[DriveModuleDesiredValues]):
-        self.time = time
+        self.time_since_start_of_profile = time
         self.drive_module_states = drive_module_states
 
 class ModuleFollowsBodySteeringController():
@@ -218,7 +218,7 @@ class ModuleFollowsBodySteeringController():
         result: List[DriveModuleDesiredValuesProfilePoint] = []
         for step in range(next_time_step, time_fraction_end, 1):
             time_fraction = (float(step)) / 100
-            time = profile_time * time_fraction + self.profile_was_started_at_time_in_seconds
+            time = profile_time * time_fraction
             states = self.drive_module_state_at_profile_time(time_fraction)
 
             point = DriveModuleDesiredValuesProfilePoint(time, states)

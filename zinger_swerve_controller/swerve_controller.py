@@ -425,7 +425,7 @@ class SwerveController(Node):
 
         for desired_value in points:
 
-            time_duration = TimeDuration(seconds=desired_value.time)
+            time_duration = TimeDuration(seconds=desired_value.time_since_start_of_profile)
             duration_msg = time_duration.to_msg()
 
             steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
