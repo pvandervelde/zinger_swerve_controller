@@ -209,16 +209,17 @@ class ModuleFollowsBodySteeringController():
 
         profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
         time_fraction_start = time_from_start_of_profile / profile_time
-        time_fraction_end = 1.0
+        time_fraction_end = 100
 
         # Take time steps of 1/100 of the total profile time. Find the next time step we should take and
         # then find the number of steps we have left to take in the current
-        next_time_step = self.round_up(time_fraction_start, 0.01)
+        next_time_step = int(self.round_up(time_fraction_start, 0.01) * 100)
 
         result: List[DriveModuleDesiredValuesProfilePoint] = []
-        for step in range(next_time_step, time_fraction_end, 0.01):
-            time = profile_time * step + self.profile_was_started_at_time_in_seconds
-            states = self.drive_module_state_at_profile_time(step)
+        for step in range(next_time_step, time_fraction_end, 1):
+            time_fraction = (float(step)) / 100
+            time = profile_time * time_fraction + self.profile_was_started_at_time_in_seconds
+            states = self.drive_module_state_at_profile_time(time_fraction)
 
             point = DriveModuleDesiredValuesProfilePoint(time, states)
             result.append(point)
