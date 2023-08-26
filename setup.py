@@ -25,7 +25,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'zinger_swerve_controller = zinger_swerve_controller.swerve_controller:main',
+            'swerve_controller = zinger_swerve_controller.swerve_controller:main',
         ],
     },
 )
