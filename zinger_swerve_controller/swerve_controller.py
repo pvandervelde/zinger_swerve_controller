@@ -13,10 +13,11 @@
 from typing import List
 import rclpy
 from rclpy.clock import Clock, Time
+from rclpy.duration import Duration as TimeDuration
 from rclpy.node import Node
 from tf2_geometry_msgs import TransformStamped
 
-from builtin_interfaces.msg import Duration
+from builtin_interfaces.msg import Duration as MsgDuration
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
@@ -397,16 +398,19 @@ class SwerveController(Node):
 
         for desired_value in points:
 
+            time_duration = TimeDuration(desired_value.time)
+            duration_msg = time_duration.to_msg()
+
             steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
             steering_angle = JointTrajectoryPoint()
             steering_angle.positions = steering_angle_values
-            steering_angle.time_from_start = Duration(sec=desired_value.time)
+            steering_angle.time_from_start = duration_msg
             position_msg.points.append(steering_angle)
 
             drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
             drive_velocity = JointTrajectoryPoint()
             drive_velocity.velocities = drive_velocity_values
-            drive_velocity.time_from_start = Duration(sec=desired_value.time)
+            drive_velocity.time_from_start = duration_msg
             velocity_msg.points.append(drive_velocity)
 
         # Publish the next steering angle and the next velocity sets. Note that
