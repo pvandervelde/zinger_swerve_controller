@@ -377,45 +377,33 @@ class SwerveController(Node):
         # send out Odom
         self.publish_odometry()
 
+        steering_joint_names = [x.steering_link_name for x in self.drive_modules]
+        position_msg = JointTrajectory()
+        position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
+
+        drive_joint_names = [x.driving_link_name for x in self.drive_modules]
+        velocity_msg = JointTrajectory()
+        velocity_msg.joint_names = drive_joint_names
+
         # Technically we only need to send updates if:
         # - The desired end-state has changed
         # - The current state doesn't match the trajectory
         time: Time = self.get_clock().now()
         points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
 
-        steering_angle_points: List[JointTrajectoryPoint] = []
-        drive_velocity_points: List[JointTrajectoryPoint] = []
         for desired_value in points:
 
             steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
             steering_angle = JointTrajectoryPoint()
             steering_angle.positions = steering_angle_values
             steering_angle.time_from_start = Duration(sec=desired_value.time)
-            steering_angle_points.append(steering_angle)
+            position_msg.points.append(steering_angle)
 
             drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
             drive_velocity = JointTrajectoryPoint()
             drive_velocity.velocities = drive_velocity_values
             drive_velocity.time_from_start = Duration(sec=desired_value.time)
-            drive_velocity_points.append(drive_velocity)
-
-        steering_joint_names = [x.steering_link_name for x in self.drive_modules]
-        self.get_logger().debug(
-            f'Updating joint states for: "{steering_joint_names}"'
-        )
-
-        position_msg = JointTrajectory()
-        position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
-        position_msg.points.extend(steering_angle_points)
-
-        drive_joint_names = [x.driving_link_name for x in self.drive_modules]
-        self.get_logger().debug(
-            f'Updating joint states for: "{drive_joint_names}"'
-        )
-
-        velocity_msg = JointTrajectory()
-        velocity_msg.joint_names = drive_joint_names
-        velocity_msg.points.extend(drive_velocity_points)
+            velocity_msg.points.append(drive_velocity)
 
         # Publish the next steering angle and the next velocity sets. Note that
         # The velocity is published (very) shortly after the position data, which means
