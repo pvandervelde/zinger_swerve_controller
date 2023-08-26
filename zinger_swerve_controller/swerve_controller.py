@@ -45,6 +45,8 @@ class SwerveController(Node):
         self.declare_parameter("steering_joints", ["joint1", "joint2"])
         self.declare_parameter("drive_joints", ["joint1", "joint2"])
 
+        self.get_logger().info(f'Initializing swerve controller ...')
+
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
         steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
@@ -66,24 +68,37 @@ class SwerveController(Node):
         # publish odometry
         odom_topic = "/odom"
         self.odometry_publisher = self.create_publisher(Odometry, odom_topic, 1)
+        self.get_logger().info(
+            f'Publishing odometry information on topic "{odom_topic}"'
+        )
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
         # registered
+        self.get_logger().info(f'Storing drive module information...')
         self.drive_modules = self.get_drive_modules()
         self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile)
 
         # Create the timer that is used to ensure that we publish movement data regularly
         cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
+        self.get_logger().info(
+            f'Publishing changes at fequency: "{cycle_time_in_hertz}" Hz'
+        )
+
         self.timer = self.create_timer(1.0 / cycle_time_in_hertz, self.timer_callback)
         self.i = 0
 
         # Listen for state changes in the drive modules
+        joint_state_topic = "joint_states"
         self.state_change_subscription = self.create_subscription(
             JointState,
-            "joint_states",
+            joint_state_topic,
             self.joint_states_callback,
             10
+        )
+
+        self.get_logger().info(
+            f'Listening for drive module state changes on "{joint_state_topic}"'
         )
 
         # Initialize the drive modules
@@ -132,12 +147,18 @@ class SwerveController(Node):
         steering_joints = []
         for name in steering_joint_names:
             steering_joints.append(name)
+            self.get_logger().info(
+                f'Discovered steering joint: "{name}"'
+            )
 
         # store the drive joints
         drive_joint_names = self.get_parameter("drive_joints").value
         drive_joints = []
         for name in drive_joint_names:
             drive_joints.append(name)
+            self.get_logger().info(
+                f'Discovered drive joint: "{name}"'
+            )
 
         drive_modules: List[DriveModule] = []
         drive_module_name = "left_front"
@@ -157,6 +178,13 @@ class SwerveController(Node):
         )
         drive_modules.append(left_front)
 
+        self.get_logger().info(
+            f'Configured drive module: "{left_front.name}" ' +
+            f'with steering link: "{left_front.steering_link_name}" ' +
+            f'and drive link: "{left_front.driving_link_name}" ' +
+            f'and position: ["{left_front.steering_axis_xy_position.x}", "{left_front.steering_axis_xy_position.y}"]'
+        )
+
         drive_module_name = "left_rear"
         left_rear = DriveModule(
             name=drive_module_name,
@@ -173,6 +201,13 @@ class SwerveController(Node):
             drive_motor_maximum_acceleration=1.0
         )
         drive_modules.append(left_rear)
+
+        self.get_logger().info(
+            f'Configured drive module: "{left_rear.name}" ' +
+            f'with steering link: "{left_rear.steering_link_name}" ' +
+            f'and drive link: "{left_rear.driving_link_name}" ' +
+            f'and position: ["{left_rear.steering_axis_xy_position.x}", "{left_rear.steering_axis_xy_position.y}"]'
+        )
 
         drive_module_name = "right_rear"
         right_rear = DriveModule(
@@ -191,6 +226,13 @@ class SwerveController(Node):
         )
         drive_modules.append(right_rear)
 
+        self.get_logger().info(
+            f'Configured drive module: "{right_rear.name}" ' +
+            f'with steering link: "{right_rear.steering_link_name}" ' +
+            f'and drive link: "{right_rear.driving_link_name}" ' +
+            f'and position: ["{right_rear.steering_axis_xy_position.x}", "{right_rear.steering_axis_xy_position.y}"]'
+        )
+
         drive_module_name = "right_front"
         right_front = DriveModule(
             name=drive_module_name,
@@ -207,6 +249,13 @@ class SwerveController(Node):
             drive_motor_maximum_acceleration=1.0
         )
         drive_modules.append(right_front)
+
+        self.get_logger().info(
+            f'Configured drive module: "{right_front.name}" ' +
+            f'with steering link: "{right_front.steering_link_name}" ' +
+            f'and drive link: "{right_front.driving_link_name}" ' +
+            f'and position: ["{right_front.steering_axis_xy_position.x}", "{right_front.steering_axis_xy_position.y}"]'
+        )
 
         return drive_modules
 
@@ -230,6 +279,10 @@ class SwerveController(Node):
                 0.0
             )
             measured_drive_states.append(value)
+
+            self.get_logger().debug(
+                f'Initializing drive module state for module: "{drive_module.name}"'
+            )
 
         self.update_controller_time()
         self.controller.on_state_update(measured_drive_states)
@@ -266,10 +319,24 @@ class SwerveController(Node):
                     0.0
                 )
                 measured_drive_states.append(value)
+
+                self.get_logger().debug(
+                    f'Updating joint states for: "{drive_module.name}" with: ' +
+                    f'[ steering angle: "{joint_positions[steering_values_index]}", ' +
+                    f' steering velocity: "{joint_velocities[steering_values_index]}",' +
+                    f' velocity: "{joint_velocities[drive_values_index]}" ] '
+                )
             else:
                 # grab the previous state and just assume that's the one
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
+
+                self.get_logger().debug(
+                    f'Updating joint states for: "{drive_module.name}" with: ' +
+                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
+                )
 
         # Ideally we would get the time from the message. And then check if we have gotten a more
         # recent message
@@ -320,13 +387,15 @@ class SwerveController(Node):
         drive_velocity_points: List[JointTrajectoryPoint] = []
         for desired_value in points:
 
+            steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
             steering_angle = JointTrajectoryPoint()
-            steering_angle.positions = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
+            steering_angle.positions = steering_angle_values
             steering_angle.time_from_start = Duration(sec=desired_value.time)
             steering_angle_points.append(steering_angle)
 
+            drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
             drive_velocity = JointTrajectoryPoint()
-            drive_velocity.velocities = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
+            drive_velocity.velocities = drive_velocity_values
             drive_velocity.time_from_start = Duration(sec=desired_value.time)
             drive_velocity_points.append(drive_velocity)
 
