@@ -293,7 +293,7 @@ class SwerveController(Node):
             )
             measured_drive_states.append(value)
 
-            self.get_logger().debug(
+            self.get_logger().info(
                 f'Initializing drive module state for module: "{drive_module.name}"'
             )
 
@@ -306,7 +306,7 @@ class SwerveController(Node):
         if msg == None:
             return
 
-        self.get_logger().debug(
+        self.get_logger().info(
             f'Received a JointState message: "{msg}"'
         )
 
@@ -337,7 +337,7 @@ class SwerveController(Node):
                 )
                 measured_drive_states.append(value)
 
-                self.get_logger().debug(
+                self.get_logger().info(
                     f'Updating joint states for: "{drive_module.name}" with: ' +
                     f'[ steering angle: "{joint_positions[steering_values_index]}", ' +
                     f' steering velocity: "{joint_velocities[steering_values_index]}",' +
@@ -348,7 +348,7 @@ class SwerveController(Node):
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
-                self.get_logger().debug(
+                self.get_logger().info(
                     f'Updating joint states for: "{drive_module.name}" with: ' +
                     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
                     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
@@ -431,12 +431,14 @@ class SwerveController(Node):
             steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
             steering_angle = JointTrajectoryPoint()
             steering_angle.positions = steering_angle_values
+            #steering_angle.velocities = steering_angle_velocities
             steering_angle.time_from_start = duration_msg
             position_msg.points.append(steering_angle)
 
             drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
             drive_velocity = JointTrajectoryPoint()
             drive_velocity.velocities = drive_velocity_values
+            #drive_velocity.accelerations = drive_velocity_accelerations
             drive_velocity.time_from_start = duration_msg
             velocity_msg.points.append(drive_velocity)
 
@@ -450,7 +452,6 @@ class SwerveController(Node):
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
         self.last_control_update_send_at = self.last_recorded_time
-
 
 
 def main(args=None):
