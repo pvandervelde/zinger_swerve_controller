@@ -50,8 +50,8 @@ class SwerveController(Node):
 
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
-        steering_angle_publish_topic = "/" + position_controller_name + "/" + "joint_trajectory"
-        self.drive_module_steering_angle_publisher = self.create_publisher(JointTrajectory, steering_angle_publish_topic, 1)
+        steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
+        self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic, 1)
 
         self.get_logger().info(
             f'Publishing steering angle changes on topic "{steering_angle_publish_topic}"'
@@ -59,8 +59,8 @@ class SwerveController(Node):
 
         # publish the module drive velocity
         velocity_controller_name = self.get_parameter("velocity_controller_name").value
-        velocity_publish_topic = "/" + velocity_controller_name + "/" + "joint_trajectory"
-        self.drive_module_velocity_publisher = self.create_publisher(JointTrajectory, velocity_publish_topic, 1)
+        velocity_publish_topic = "/" + velocity_controller_name + "/" + "commands"
+        self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic, 1)
 
         self.get_logger().info(
             f'Publishing drive velocity changes on topic "{velocity_publish_topic}"'
@@ -87,12 +87,16 @@ class SwerveController(Node):
         self.last_velocity_command_received_at = self.last_recorded_time
 
         # Create the timer that is used to ensure that we publish movement data regularly
-        cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
+        self.cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
         self.get_logger().info(
-            f'Publishing changes at fequency: "{cycle_time_in_hertz}" Hz'
+            f'Publishing changes at fequency: "{self.cycle_time_in_hertz}" Hz'
         )
 
-        self.timer = self.create_timer(1.0 / cycle_time_in_hertz, self.timer_callback)
+        self.timer = self.create_timer(
+            1.0 / self.cycle_time_in_hertz,
+            self.timer_callback,
+            callback_group=None,
+            clock=self.get_clock())
         self.i = 0
 
         # Listen for state changes in the drive modules
@@ -397,50 +401,49 @@ class SwerveController(Node):
     def timer_callback(self):
         self.store_time_and_update_controller_time()
 
-        # send out Odom
+        # always send out the odometry information
         self.publish_odometry()
 
-        # Technically we only need to send updates if:
-        # - The desired end-state has changed
-        # - The current state doesn't match the trajectory
-        if self.last_control_update_send_at > self.last_velocity_command_received_at:
+        # Check if we actually have a movement profile to send
+        current_time = self.get_clock().now()
+        trajectory_running_duration: TimeDuration = current_time - self.last_velocity_command_received_at
+        self.get_logger().info(
+            'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
+                trajectory_running_duration,
+                current_time,
+                self.last_velocity_command_received_at
+            )
+        )
+
+        running_duration_as_float: float = trajectory_running_duration.nanoseconds * 1e-9
+        self.get_logger().info(
+            'Current trajectory duration {} s'.format(running_duration_as_float)
+        )
+
+        if running_duration_as_float > self.controller.min_time_for_profile:
+            self.get_logger().info(
+                'Trajectory completed waiting for next command.'
+            )
             return
 
-        time: Time = self.get_clock().now()
-        points: List[DriveModuleDesiredValuesProfilePoint] = self.controller.drive_module_profile_points_from_now_till_end(time.nanoseconds * 1e-9) # THIS NEEDS TO BE SIM TIME IF RUNNING IN GAZEBO
+        next_time_step = running_duration_as_float + 1.0 / self.cycle_time_in_hertz
+        self.get_logger().info(
+            'Calculating next step in profile at time {} s'.format(running_duration_as_float)
+        )
+
+        drive_module_states = self.controller.drive_module_state_at_future_time(next_time_step)
 
         # Only publish movement commands if there is a trajectory
-        if len(points) == 0:
+        if len(drive_module_states) == 0:
             return
 
-        steering_joint_names = [x.steering_link_name for x in self.drive_modules]
-        position_msg = JointTrajectory()
-        #position_msg.header.stamp = self.last_recorded_time.to_msg()
-        position_msg.joint_names = steering_joint_names # we can probably optimze this away, at some point
+        position_msg = Float64MultiArray()
+        steering_angle_values = [a.steering_angle_in_radians for a in drive_module_states]
+        position_msg.data = steering_angle_values
 
-        drive_joint_names = [x.driving_link_name for x in self.drive_modules]
-        velocity_msg = JointTrajectory()
-        #velocity_msg.header.stamp = self.last_recorded_time.to_msg()
-        velocity_msg.joint_names = drive_joint_names
-
-        for desired_value in points:
-
-            time_duration = TimeDuration(seconds=desired_value.time_since_start_of_profile)
-            duration_msg = time_duration.to_msg()
-
-            steering_angle_values = [a.steering_angle_in_radians for a in desired_value.drive_module_states]
-            steering_angle = JointTrajectoryPoint()
-            steering_angle.positions = steering_angle_values
-            #steering_angle.velocities = steering_angle_velocities
-            steering_angle.time_from_start = duration_msg
-            position_msg.points.append(steering_angle)
-
-            drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in desired_value.drive_module_states]
-            drive_velocity = JointTrajectoryPoint()
-            drive_velocity.velocities = drive_velocity_values
-            #drive_velocity.accelerations = drive_velocity_accelerations
-            drive_velocity.time_from_start = duration_msg
-            velocity_msg.points.append(drive_velocity)
+        velocity_msg = Float64MultiArray()
+        drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in drive_module_states]
+        velocity_msg.data = drive_velocity_values
 
         # Publish the next steering angle and the next velocity sets. Note that
         # The velocity is published (very) shortly after the position data, which means
