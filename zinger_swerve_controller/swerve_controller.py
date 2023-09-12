@@ -15,7 +15,6 @@ import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
 from rclpy.node import Node
-from rclpy.logging import
 from tf2_geometry_msgs import TransformStamped
 
 from builtin_interfaces.msg import Duration as MsgDuration
