@@ -426,9 +426,9 @@ class SwerveController(Node):
             )
             return
 
-        next_time_step = running_duration_as_float + 1.0 / self.cycle_time_in_hertz
+        next_time_step = current_time.nanoseconds * 1e-9 + 1.0 / self.cycle_time_in_hertz
         self.get_logger().info(
-            'Calculating next step in profile at time {} s'.format(running_duration_as_float)
+            'Calculating next step in profile at time {} s'.format(next_time_step)
         )
 
         drive_module_states = self.controller.drive_module_state_at_future_time(next_time_step)
