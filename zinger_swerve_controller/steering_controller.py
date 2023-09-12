@@ -286,8 +286,15 @@ class ModuleFollowsBodySteeringController():
 
          # Calculate the current body state
         body_motion = self.control_model.body_motion_from_wheel_module_states(self.module_states)
+        self.logger(
+            'Body motion: {}'.format(body_motion)
+        )
 
         time_step_in_seconds = self.current_time_in_seconds - self.last_state_update_time
+        self.logger(
+            'Determining body position at {}. Last update at: {}. Time delta: {}'.format(self.current_time_in_seconds, self.last_state_update_time, time_step_in_seconds)
+        )
+
         # Position
         local_x_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.x + body_motion.linear_velocity.x)
         local_y_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.y + body_motion.linear_velocity.y)
@@ -314,7 +321,7 @@ class ModuleFollowsBodySteeringController():
 
         self.body_state = BodyState(
             self.body_state.position_in_world_coordinates.x + local_x_distance * math.cos(global_orientation) - local_y_distance * math.sin(global_orientation),
-            self. body_state.position_in_world_coordinates.y + local_x_distance * math.sin(global_orientation) + local_y_distance * math.cos(global_orientation),
+            self.body_state.position_in_world_coordinates.y + local_x_distance * math.sin(global_orientation) + local_y_distance * math.cos(global_orientation),
             global_orientation,
             body_motion.linear_velocity.x,
             body_motion.linear_velocity.y,
