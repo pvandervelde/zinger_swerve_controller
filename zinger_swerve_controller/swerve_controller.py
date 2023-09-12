@@ -15,6 +15,7 @@ import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
 from rclpy.node import Node
+from rclpy.logging import
 from tf2_geometry_msgs import TransformStamped
 
 from builtin_interfaces.msg import Duration as MsgDuration
@@ -78,7 +79,7 @@ class SwerveController(Node):
         # registered
         self.get_logger().info(f'Storing drive module information...')
         self.drive_modules = self.get_drive_modules()
-        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile)
+        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile, self.write_log)
 
         # initialize the time tracking variables after we get the controller up and running
         # so that we can initialize the controller at the same time.
@@ -407,7 +408,7 @@ class SwerveController(Node):
         # Check if we actually have a movement profile to send
         current_time = self.get_clock().now()
         trajectory_running_duration: TimeDuration = current_time - self.last_velocity_command_received_at
-        self.get_logger().info(
+        self.get_logger().debug(
             'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
                 trajectory_running_duration,
                 current_time,
@@ -455,6 +456,9 @@ class SwerveController(Node):
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
         self.last_control_update_send_at = self.last_recorded_time
+
+    def write_log(self, text: str):
+        self.get_logger().info(text)
 
 
 def main(args=None):

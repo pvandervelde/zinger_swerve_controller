@@ -34,10 +34,12 @@ class ModuleFollowsBodySteeringController():
     def __init__(
             self,
             drive_modules: List[DriveModule],
-            motion_profile_func: Callable[[float, float], TransientVariableProfile]):
+            motion_profile_func: Callable[[float, float], TransientVariableProfile],
+            logger: Callable[[str], None]):
         # Get the geometry for the robot
         self.modules = drive_modules
         self.motion_profile_func = motion_profile_func
+        self.logger = logger
 
         # Use a simple control model for the time being. Just need something that roughly works
         self.control_model = SimpleFourWheelSteeringControlModel(self.modules)
@@ -111,6 +113,10 @@ class ModuleFollowsBodySteeringController():
         return self.module_states
 
     def drive_module_state_at_profile_time(self, time_fraction: float) -> List[DriveModuleDesiredValues]:
+        self.logger(
+            'Determining profile values at time fraction {}'.format(time_fraction)
+        )
+
         result: List[DriveModuleDesiredValues] = []
         if self.is_executing_body_profile:
             body_state = self.body_profile.body_motion_at(time_fraction)
@@ -191,6 +197,9 @@ class ModuleFollowsBodySteeringController():
             return []
 
         time_from_start_of_profile = future_time_in_seconds - self.profile_was_started_at_time_in_seconds
+        self.logger(
+            'Determining profile values at {}'.format(time_from_start_of_profile)
+        )
 
         profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
         time_fraction = time_from_start_of_profile / profile_time
@@ -241,6 +250,10 @@ class ModuleFollowsBodySteeringController():
 
             self.is_executing_body_profile = True
             self.is_executing_module_profile = False
+
+            self.logger(
+                'Starting body motion profile with starting state {} and desired end state {}'.format(self.body_state, desired_motion)
+            )
         else:
             if isinstance(desired_motion, DriveModuleMotionCommand):
                 trajectory = DriveModuleStateProfile(self.modules, desired_motion.time_for_motion(), self.motion_profile_func)
@@ -250,6 +263,10 @@ class ModuleFollowsBodySteeringController():
 
                 self.is_executing_body_profile = False
                 self.is_executing_module_profile = True
+
+                self.logger(
+                    'Starting module motion profile with starting state {} and desired end state {}'.format(self.body_state, desired_motion)
+                )
             else:
                 raise InvalidMotionCommandException()
 
