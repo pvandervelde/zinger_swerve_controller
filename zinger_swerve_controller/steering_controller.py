@@ -357,6 +357,13 @@ class ModuleFollowsBodySteeringController():
             orientation_jerk
         )
 
+        self.logger(
+            'position: [{}, {}]'.format(
+                self.body_state.position_in_world_coordinates.x,
+                self.body_state.position_in_world_coordinates.y,
+            )
+        )
+
         self.last_state_update_time = self.current_time_in_seconds
 
     # On clock tick, determine if we need to recalculate the trajectories for the drive modules

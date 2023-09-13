@@ -131,7 +131,7 @@ class SwerveController(Node):
         if msg == None:
             return
 
-        self.get_logger().debug(
+        self.get_logger().info(
             f'Received a Twist message: "{msg}"'
         )
 
@@ -341,7 +341,7 @@ class SwerveController(Node):
                 )
                 measured_drive_states.append(value)
 
-                self.get_logger().info(
+                self.get_logger().debug(
                     f'Updating joint states for: "{drive_module.name}" with: ' +
                     f'[ steering angle: "{joint_positions[steering_values_index]}", ' +
                     f' steering velocity: "{joint_velocities[steering_values_index]}",' +
@@ -352,7 +352,7 @@ class SwerveController(Node):
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
-                self.get_logger().info(
+                self.get_logger().debug(
                     f'Updating joint states for: "{drive_module.name}" with: ' +
                     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
                     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
@@ -389,6 +389,10 @@ class SwerveController(Node):
         msg.twist.twist.angular.z = body_state.motion_in_body_coordinates.angular_velocity.z
 
         # For now we ignore the covariances
+
+        self.get_logger().info(
+            'Publishing odometry message {}'.format(msg)
+        )
 
         self.odometry_publisher.publish(msg)
 
