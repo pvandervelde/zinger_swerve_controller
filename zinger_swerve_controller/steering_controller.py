@@ -307,7 +307,7 @@ class ModuleFollowsBodySteeringController():
         self.logger(
             'x-velocity: previous body velocity {}; current body velocity {}. x-distance {}'.format(
                 self.body_state.motion_in_body_coordinates.linear_velocity.x,
-                body_motion.linear_velocity.y,
+                body_motion.linear_velocity.x,
                 local_x_distance,
             )
         )
