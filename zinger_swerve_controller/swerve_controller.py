@@ -335,7 +335,7 @@ class SwerveController(Node):
                     joint_velocities[steering_values_index],
                     0.0,
                     0.0,
-                    joint_velocities[drive_values_index],
+                    joint_velocities[drive_values_index] * drive_module.wheel_radius,
                     0.0,
                     0.0
                 )
@@ -445,8 +445,15 @@ class SwerveController(Node):
         steering_angle_values = [a.steering_angle_in_radians for a in drive_module_states]
         position_msg.data = steering_angle_values
 
+        # Note that the controller gives the velocity in meters per second, i.e. the velocity of the wheel at the
+        # contact point with the ground. But ROS wants to know the rotational velocity of the wheel
+        drive_velocity_values = []
+        for a in drive_module_states:
+            linear_velocity = a.drive_velocity_in_meters_per_second
+            wheel_radius = next((x.wheel_radius for x in self.drive_modules if x.name == a.name), 0.0)
+            drive_velocity_values.append(linear_velocity / wheel_radius)
+
         velocity_msg = Float64MultiArray()
-        drive_velocity_values = [a.drive_velocity_in_meters_per_second for a in drive_module_states]
         velocity_msg.data = drive_velocity_values
 
         # Publish the next steering angle and the next velocity sets. Note that
