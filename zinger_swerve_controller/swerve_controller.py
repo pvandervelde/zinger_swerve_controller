@@ -341,11 +341,11 @@ class SwerveController(Node):
                 )
                 measured_drive_states.append(value)
 
-                self.get_logger().debug(
+                self.get_logger().info(
                     f'Updating joint states for: "{drive_module.name}" with: ' +
-                    f'[ steering angle: "{joint_positions[steering_values_index]}", ' +
-                    f' steering velocity: "{joint_velocities[steering_values_index]}",' +
-                    f' velocity: "{joint_velocities[drive_values_index]}" ] '
+                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
                 )
             else:
                 # grab the previous state and just assume that's the one
@@ -450,7 +450,7 @@ class SwerveController(Node):
         drive_velocity_values = []
         for a in drive_module_states:
             linear_velocity = a.drive_velocity_in_meters_per_second
-            wheel_radius = next((x.wheel_radius for x in self.drive_modules if x.name == a.name), 0.0)
+            wheel_radius = next((x.wheel_radius for x in self.drive_modules if x.name == a.name), 1.0)
             drive_velocity_values.append(linear_velocity / wheel_radius)
 
         velocity_msg = Float64MultiArray()
