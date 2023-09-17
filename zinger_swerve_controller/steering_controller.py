@@ -304,22 +304,7 @@ class ModuleFollowsBodySteeringController():
 
         # Position
         local_x_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.x + body_motion.linear_velocity.x)
-        self.logger(
-            'x-velocity: previous body velocity {}; current body velocity {}. x-distance {}'.format(
-                self.body_state.motion_in_body_coordinates.linear_velocity.x,
-                body_motion.linear_velocity.x,
-                local_x_distance,
-            )
-        )
-
         local_y_distance = time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.linear_velocity.y + body_motion.linear_velocity.y)
-        self.logger(
-            'y-velocity: previous body velocity {}; current body velocity {}. y-distance {}'.format(
-                self.body_state.motion_in_body_coordinates.linear_velocity.y,
-                body_motion.linear_velocity.y,
-                local_y_distance,
-            )
-        )
 
         # Orientation
         global_orientation = self.body_state.orientation_in_world_coordinates.z + time_step_in_seconds * 0.5 * (self.body_state.motion_in_body_coordinates.angular_velocity.z + body_motion.angular_velocity.z)

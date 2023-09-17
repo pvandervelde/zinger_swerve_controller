@@ -420,18 +420,18 @@ class SwerveController(Node):
         )
 
         running_duration_as_float: float = trajectory_running_duration.nanoseconds * 1e-9
-        self.get_logger().info(
+        self.get_logger().debug(
             'Current trajectory duration {} s'.format(running_duration_as_float)
         )
 
         if running_duration_as_float > self.controller.min_time_for_profile:
-            self.get_logger().info(
+            self.get_logger().debug(
                 'Trajectory completed waiting for next command.'
             )
             return
 
         next_time_step = current_time.nanoseconds * 1e-9 + 1.0 / self.cycle_time_in_hertz
-        self.get_logger().info(
+        self.get_logger().debug(
             'Calculating next step in profile at time {} s'.format(next_time_step)
         )
 
