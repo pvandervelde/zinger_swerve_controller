@@ -318,7 +318,16 @@ class ModuleFollowsBodySteeringController():
             self.is_executing_module_profile = False
 
             self.logger(
-                'Starting body motion profile with starting state {} and desired end state {}'.format(self.body_state, desired_motion)
+                'Starting body motion profile with starting state [[x:{}, y:{}, o:{}],[vx:{}, vy:{}, vo:{}]] and desired end state [vx:{}, vy:{},vo:{}]'.format(
+                    self.body_state.position_in_world_coordinates.x,
+                    self.body_state.position_in_world_coordinates.y,
+                    self.body_state.orientation_in_world_coordinates.z,
+                    self.body_state.motion_in_body_coordinates.linear_velocity.x,
+                    self.body_state.motion_in_body_coordinates.linear_velocity.y,
+                    self.body_state.motion_in_body_coordinates.angular_velocity.z,
+                    desired_motion.linear_velocity.x,
+                    desired_motion.linear_velocity.y,
+                    desired_motion.angular_velocity.z,)
             )
         else:
             if isinstance(desired_motion, DriveModuleMotionCommand):
