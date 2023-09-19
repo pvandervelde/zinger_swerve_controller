@@ -158,7 +158,7 @@ class ModuleFollowsBodySteeringController():
                         # first rotation and velocity change are the smallest, so take the first state
                         result.append(states_for_module[0])
                         self.logger(
-                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 1]'.format(
+                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
                                 self.modules[i].name,
                                 current_steering_angle,
                                 current_velocity,
@@ -175,7 +175,7 @@ class ModuleFollowsBodySteeringController():
                             # pick the second state
                             result.append(states_for_module[1])
                             self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 2]'.format(
+                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
                                     self.modules[i].name,
                                     current_steering_angle,
                                     current_velocity,
@@ -189,7 +189,7 @@ class ModuleFollowsBodySteeringController():
                             # first rotation is the smallest but second velocity is the smallest
                             result.append(states_for_module[0])
                             self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 1]'.format(
+                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
                                     self.modules[i].name,
                                     current_steering_angle,
                                     current_velocity,
@@ -204,7 +204,7 @@ class ModuleFollowsBodySteeringController():
                         # second rotation and velocity change are the smallest, so take the second state
                         result.append(states_for_module[1])
                         self.logger(
-                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 2]'.format(
+                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
                                 self.modules[i].name,
                                 current_steering_angle,
                                 current_velocity,
@@ -221,7 +221,7 @@ class ModuleFollowsBodySteeringController():
                             # pick the first state
                             result.append(states_for_module[0])
                             self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 1]'.format(
+                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
                                     self.modules[i].name,
                                     current_steering_angle,
                                     current_velocity,
@@ -235,7 +235,7 @@ class ModuleFollowsBodySteeringController():
                             # second rotation is the smallest but first velocity is the smallest
                             result.append(states_for_module[1])
                             self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s. Selected option 2]'.format(
+                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
                                     self.modules[i].name,
                                     current_steering_angle,
                                     current_velocity,
@@ -418,9 +418,12 @@ class ModuleFollowsBodySteeringController():
         )
 
         self.logger(
-            'position: [{}, {}] orientation [[]]'.format(
+            'position: [{}, {}, {}] orientation [[{}, {}, {}]]'.format(
                 self.body_state.position_in_world_coordinates.x,
                 self.body_state.position_in_world_coordinates.y,
+                self.body_state.position_in_world_coordinates.z,
+                self.body_state.orientation_in_world_coordinates.x,
+                self.body_state.orientation_in_world_coordinates.y,
                 self.body_state.orientation_in_world_coordinates.z,
             )
         )
