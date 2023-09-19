@@ -1,0 +1,21 @@
+swerve_controller:
+  ros__parameters:
+
+    twist_topic: cmd_vel
+
+    position_controller_name: "drive_module_steering_angle_controller"
+    velocity_controller_name: "drive_module_velocity_controller"
+
+    cycle_fequency: 50
+
+    steering_joints:
+      - joint_chassis_to_steering_left_front
+      - joint_chassis_to_steering_right_front
+      - joint_chassis_to_steering_left_rear
+      - joint_chassis_to_steering_right_rear
+
+    drive_joints:
+      - joint_steering_to_wheel_left_front
+      - joint_steering_to_wheel_right_front
+      - joint_steering_to_wheel_left_rear
+      - joint_steering_to_wheel_right_rear
