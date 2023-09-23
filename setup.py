@@ -20,7 +20,7 @@ setup(
     zip_safe=True,
     maintainer='petrik',
     maintainer_email='petrikvandervelde@gmail.com',
-    description='TODO: Package description',
+    description='Defines a four wheel independent steering, aka swerve, controller for the zinger robot.',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={

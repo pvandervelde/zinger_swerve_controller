@@ -27,14 +27,27 @@ This repository contains different folders for the different parts of the robot 
 * The launch directory contains the launch files
   * [launch/swerve_controller.launch.py](launch/swerve_controller.launch.py) - Launches the controller node.
 * The source code for the swerve controller
-  * [urdf/base.xacro](urdf/base.xacro) - The geometric description of the robot with the different
-    [link](http://wiki.ros.org/urdf/XML/link) and [joint](http://wiki.ros.org/urdf/XML/joint)
-    elements.
-  * [urdf/gazebo.xacro](urdf/gazebo.xacro) - The Gazebo specific additions to the model, e.g. the
-    materials for the different links and the ROS control integration.
-  * [urdf/macros.xacro](urdf/macros.xacro) - The XACRO macros for the robot. Contains the macros for
-    the steering modules that consist of a wheel and a wheel bracket.
-  * [urdf/materials.xacro](urdf/materials.xacro) - Specifies the material properties for Gazebo and Rviz
+  * [zinger_swerve_controller/control_model.py](zinger_swerve_controller/control_model.py) - Defines the inverse and forward
+    kinematics.
+  * [zinger_swerve_controller/control_profile.py](zinger_swerve_controller/control_profile.py) - Defines the body and module
+    motion profiles.
+  * [zinger_swerve_controller/control.py](zinger_swerve_controller/control.py) - Defines the different motion control commands
+    that can be specified.
+  * [zinger_swerve_controller/drive_module.py](zinger_swerve_controller/drive_module.py) - Defines the properties for a
+    drive module.
+  * [zinger_swerve_controller/errors.py](zinger_swerve_controller/errors.py) - Defines custom errors.
+  * [zinger_swerve_controller/geometry.py](zinger_swerve_controller/geometry.py) - Defines standard geometry elements.
+  * [zinger_swerve_controller/profile.py](zinger_swerve_controller/profile.py) - Defines the motion control
+    profile that describes how the steering angle and the drive velocity change over time when they are changed from an
+    initial value to a target value. The only current implementation is the s-curve motion profile.
+  * [zinger_swerve_controller/states.py](zinger_swerve_controller/states.py) - Defines the data structures used to contain
+    information about the current motion states.
+  * [zinger_swerve_controller/steering_controller.py](zinger_swerve_controller/steering_controller.py) - Responsible
+    for calculating the steering angles and drive velocities of the modules based on the initial state and the
+    desired final state.
+  * [zinger_swerve_controller/swerve_controller.py](zinger_swerve_controller/swerve_controller.py) - The
+    controller that sends the control commands to the different joints in the drive modules. Additionally sends
+    the odometry messages.
 
 ## Kinematics
 
