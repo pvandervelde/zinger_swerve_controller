@@ -239,5 +239,3 @@ class SingleVariableSCurveProfile(TransientVariableProfile):
         v6 = a5 * (self.t6 - self.t5) + v5
         s6 = 0.5 * a5 * math.pow(self.t6 - self.t5, 2.0) + v5 * (self.t6 - self.t5) + s5
         return 1/6 * self.jerk * math.pow(time_fraction - self.t6, 3.0) + 0.5 * a6 * math.pow(time_fraction - self.t6, 2.0) + v6 * (time_fraction - self.t6) + s6
-
-# 4th and 5th order s-curve

@@ -19,7 +19,6 @@ from .drive_module import DriveModule
 from .profile import TransientVariableProfile
 from .states import BodyState, DriveModuleDesiredValues, DriveModuleMeasuredValues, BodyMotion
 
-# A collection of position / velocity / acceleration profiles
 class BodyMotionProfile(object):
 
     def __init__(

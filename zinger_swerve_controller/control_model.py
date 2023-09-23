@@ -245,6 +245,3 @@ class SimpleFourWheelSteeringControlModel(ControlModelBase):
             result.append((forward_state, reverse_state))
 
         return result
-
-
-# Implement the Seegmiller algorithms in a different controller
