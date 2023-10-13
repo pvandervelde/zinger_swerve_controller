@@ -314,9 +314,9 @@ class SwerveController(Node):
         if msg == None:
             return
 
-        self.get_logger().debug(
-            f'Received a JointState message: "{msg}"'
-        )
+        # self.get_logger().debug(
+        #     f'Received a JointState message: "{msg}"'
+        # )
 
         # It would be better if we stored this message and processed it during our own timer loop. That way
         # we wouldn't be blocking the callback.
@@ -345,23 +345,23 @@ class SwerveController(Node):
                 )
                 measured_drive_states.append(value)
 
-                self.get_logger().info(
-                    f'Updating joint states for: "{drive_module.name}" with: ' +
-                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
-                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
-                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
-                )
+                # self.get_logger().info(
+                #     f'Updating joint states for: "{drive_module.name}" with: ' +
+                #     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                #     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                #     f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
+                # )
             else:
                 # grab the previous state and just assume that's the one
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
-                self.get_logger().debug(
-                    f'Updating joint states for: "{drive_module.name}" with: ' +
-                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
-                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
-                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
-                )
+                # self.get_logger().debug(
+                #     f'Updating joint states for: "{drive_module.name}" with: ' +
+                #     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                #     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                #     f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
+                # )
 
         # Ideally we would get the time from the message. And then check if we have gotten a more
         # recent message
@@ -396,9 +396,9 @@ class SwerveController(Node):
 
         # For now we ignore the covariances
 
-        self.get_logger().info(
-            'Publishing odometry message {}'.format(msg)
-        )
+        # self.get_logger().info(
+        #     'Publishing odometry message {}'.format(msg)
+        # )
 
         self.odometry_publisher.publish(msg)
 
@@ -436,29 +436,29 @@ class SwerveController(Node):
         # Check if we actually have a movement profile to send
         current_time = self.get_clock().now()
         trajectory_running_duration: TimeDuration = current_time - self.last_velocity_command_received_at
-        self.get_logger().debug(
-            'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
-                trajectory_running_duration,
-                current_time,
-                self.last_velocity_command_received_at
-            )
-        )
+        # self.get_logger().debug(
+        #     'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
+        #         trajectory_running_duration,
+        #         current_time,
+        #         self.last_velocity_command_received_at
+        #     )
+        # )
 
         running_duration_as_float: float = trajectory_running_duration.nanoseconds * 1e-9
-        self.get_logger().debug(
-            'Current trajectory duration {} s'.format(running_duration_as_float)
-        )
+        # self.get_logger().debug(
+        #     'Current trajectory duration {} s'.format(running_duration_as_float)
+        # )
 
         if running_duration_as_float > self.controller.min_time_for_profile:
-            self.get_logger().debug(
-                'Trajectory completed waiting for next command.'
-            )
+            # self.get_logger().debug(
+            #     'Trajectory completed waiting for next command.'
+            # )
             return
 
         next_time_step = current_time.nanoseconds * 1e-9 + 1.0 / self.cycle_time_in_hertz
-        self.get_logger().debug(
-            'Calculating next step in profile at time {} s'.format(next_time_step)
-        )
+        # self.get_logger().debug(
+        #     'Calculating next step in profile at time {} s'.format(next_time_step)
+        # )
 
         drive_module_states = self.controller.drive_module_state_at_future_time(next_time_step)
 
@@ -484,10 +484,10 @@ class SwerveController(Node):
         # Publish the next steering angle and the next velocity sets. Note that
         # The velocity is published (very) shortly after the position data, which means
         # that the velocity could lag in very tight update loops.
-        self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
+        #self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
         self.drive_module_steering_angle_publisher.publish(position_msg)
 
-        self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
+        #self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
         self.last_control_update_send_at = self.last_recorded_time
