@@ -16,6 +16,7 @@ from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
 from rclpy.node import Node
 from tf2_geometry_msgs import TransformStamped
+from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
 from builtin_interfaces.msg import Duration as MsgDuration
 from geometry_msgs.msg import Twist
@@ -72,6 +73,8 @@ class SwerveController(Node):
         self.get_logger().info(
             f'Publishing odometry information on topic "{odom_topic}"'
         )
+
+        self.send_odom_transform()
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
@@ -397,6 +400,25 @@ class SwerveController(Node):
         )
 
         self.odometry_publisher.publish(msg)
+
+    def send_odom_transform(self):
+        tf_static_broadcaster = StaticTransformBroadcaster(self)
+        transform = TransformStamped()
+        transform.header.stamp = self.get_clock().now().to_msg()
+        transform.header.frame_id = "odom"
+        transform.child_frame_id = "base_footprint"
+
+        transform.transform.translation.x = 0.0
+        transform.transform.translation.y = 0.0
+        transform.transform.translation.z = 0.0
+
+        quat = quaternion_from_euler(0.0, 0.0, 0.0)
+        transform.transform.rotation.x = quat[0]
+        transform.transform.rotation.y = quat[1]
+        transform.transform.rotation.z = quat[2]
+        transform.transform.rotation.w = quat[3]
+
+        tf_static_broadcaster.sendTransform(transform)
 
     def store_time_and_update_controller_time(self):
         time: Time = self.get_clock().now()
