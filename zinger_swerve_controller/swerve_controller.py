@@ -55,7 +55,7 @@ class SwerveController(Node):
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
         steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
-        self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic, 1)
+        self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic)
 
         self.get_logger().info(
             f'Publishing steering angle changes on topic "{steering_angle_publish_topic}"'
@@ -64,7 +64,7 @@ class SwerveController(Node):
         # publish the module drive velocity
         velocity_controller_name = self.get_parameter("velocity_controller_name").value
         velocity_publish_topic = "/" + velocity_controller_name + "/" + "commands"
-        self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic, 1)
+        self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic)
 
         self.get_logger().info(
             f'Publishing drive velocity changes on topic "{velocity_publish_topic}"'
@@ -72,7 +72,7 @@ class SwerveController(Node):
 
         # publish odometry
         odom_topic = "/odom"
-        self.odometry_publisher = self.create_publisher(Odometry, odom_topic, 1)
+        self.odometry_publisher = self.create_publisher(Odometry, odom_topic)
         self.get_logger().info(
             f'Publishing odometry information on topic "{odom_topic}"'
         )
@@ -110,8 +110,7 @@ class SwerveController(Node):
         self.state_change_subscription = self.create_subscription(
             JointState,
             joint_state_topic,
-            self.joint_states_callback,
-            10
+            self.joint_states_callback
         )
 
         self.get_logger().info(
@@ -127,8 +126,7 @@ class SwerveController(Node):
         self.cmd_vel_subscription = self.create_subscription(
             Twist,
             twist_topic,
-            self.cmd_vel_callback,
-            10)
+            self.cmd_vel_callback)
         self.get_logger().info(
             f'Listening for movement commands on topic "{twist_topic}"'
         )
