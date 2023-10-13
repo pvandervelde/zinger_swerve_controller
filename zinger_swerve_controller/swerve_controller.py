@@ -38,6 +38,7 @@ class SwerveController(Node):
     def __init__(self):
         super().__init__("publisher_velocity_controller")
         # Declare all parameters
+        self.declare_parameter("robot_base_frame", "base_footprint")
         self.declare_parameter("twist_topic", "cmd_vel")
 
         self.declare_parameter("position_controller_name", "position_controller")
@@ -48,6 +49,8 @@ class SwerveController(Node):
         self.declare_parameter("drive_joints", ["joint1", "joint2"])
 
         self.get_logger().info(f'Initializing swerve controller ...')
+
+        robot_base_link = self.get_parameter("robot_base_frame").value
 
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
@@ -74,7 +77,7 @@ class SwerveController(Node):
             f'Publishing odometry information on topic "{odom_topic}"'
         )
 
-        self.send_odom_transform()
+        self.send_odom_transform(robot_base_link)
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
@@ -401,12 +404,12 @@ class SwerveController(Node):
 
         self.odometry_publisher.publish(msg)
 
-    def send_odom_transform(self):
+    def send_odom_transform(self, robot_base_link: str):
         tf_static_broadcaster = StaticTransformBroadcaster(self)
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = "odom"
-        transform.child_frame_id = "base_footprint"
+        transform.child_frame_id = robot_base_link
 
         transform.transform.translation.x = 0.0
         transform.transform.translation.y = 0.0
