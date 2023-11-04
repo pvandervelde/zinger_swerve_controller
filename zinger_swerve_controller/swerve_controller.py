@@ -51,6 +51,8 @@ class SwerveController(Node):
 
         self.get_logger().info(f'Initializing swerve controller ...')
 
+        self.last_velocity_command: Twist = None
+
         robot_base_link = self.get_parameter("robot_base_frame").value
 
         # publish the module steering angle
@@ -167,8 +169,21 @@ class SwerveController(Node):
         if msg == None:
             return
 
+        # If this twist message is the same as last time, then we don't need to do anything
+        if self.last_velocity_command is not None:
+            if msg.linear.x == self.last_velocity_command.linear.x and \
+                msg.linear.y == self.last_velocity_command.linear.y and \
+                msg.angular.z == self.last_velocity_command.angular.z:
+
+                # The last command was the same as the current command. So just ignore it and move on.
+                self.get_logger().info(
+                    f'Received a Twist message that is the same as the last message. Taking no action. Message was: "{msg}"'
+                )
+
+                return
+
         self.get_logger().info(
-            f'Received a Twist message: "{msg}"'
+            f'Received a Twist message that is different from the last command. Processing message: "{msg}"'
         )
 
         self.store_time_and_update_controller_time()
@@ -181,6 +196,7 @@ class SwerveController(Node):
             )
         )
 
+        self.last_velocity_command = msg
         self.last_velocity_command_received_at = self.last_recorded_time
 
     def get_drive_modules(self) -> List[DriveModule]:
