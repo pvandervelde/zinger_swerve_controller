@@ -189,7 +189,7 @@ class SwerveController(Node):
         self.store_time_and_update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
-                2.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
+                1.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
                 msg.linear.x,
                 msg.linear.y,
                 msg.angular.z
