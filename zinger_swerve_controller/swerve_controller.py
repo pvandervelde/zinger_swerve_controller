@@ -15,7 +15,9 @@ import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from tf2_geometry_msgs import TransformStamped
+from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
 from builtin_interfaces.msg import Duration as MsgDuration
 from geometry_msgs.msg import Twist
@@ -37,6 +39,7 @@ class SwerveController(Node):
     def __init__(self):
         super().__init__("publisher_velocity_controller")
         # Declare all parameters
+        self.declare_parameter("robot_base_frame", "base_footprint")
         self.declare_parameter("twist_topic", "cmd_vel")
 
         self.declare_parameter("position_controller_name", "position_controller")
@@ -48,10 +51,19 @@ class SwerveController(Node):
 
         self.get_logger().info(f'Initializing swerve controller ...')
 
+        robot_base_link = self.get_parameter("robot_base_frame").value
+
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
         steering_angle_publish_topic = "/" + position_controller_name + "/" + "commands"
-        self.drive_module_steering_angle_publisher = self.create_publisher(Float64MultiArray, steering_angle_publish_topic, 1)
+        self.drive_module_steering_angle_publisher = self.create_publisher(
+            Float64MultiArray,
+            steering_angle_publish_topic,
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                durability=DurabilityPolicy.VOLATILE,
+                depth=10))
 
         self.get_logger().info(
             f'Publishing steering angle changes on topic "{steering_angle_publish_topic}"'
@@ -60,7 +72,14 @@ class SwerveController(Node):
         # publish the module drive velocity
         velocity_controller_name = self.get_parameter("velocity_controller_name").value
         velocity_publish_topic = "/" + velocity_controller_name + "/" + "commands"
-        self.drive_module_velocity_publisher = self.create_publisher(Float64MultiArray, velocity_publish_topic, 1)
+        self.drive_module_velocity_publisher = self.create_publisher(
+            Float64MultiArray,
+            velocity_publish_topic,
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                durability=DurabilityPolicy.VOLATILE,
+                depth=10))
 
         self.get_logger().info(
             f'Publishing drive velocity changes on topic "{velocity_publish_topic}"'
@@ -68,10 +87,19 @@ class SwerveController(Node):
 
         # publish odometry
         odom_topic = "/odom"
-        self.odometry_publisher = self.create_publisher(Odometry, odom_topic, 1)
+        self.odometry_publisher = self.create_publisher(
+            Odometry,
+            odom_topic,
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                durability=DurabilityPolicy.VOLATILE,
+                depth=10))
         self.get_logger().info(
             f'Publishing odometry information on topic "{odom_topic}"'
         )
+
+        self.send_odom_transform(robot_base_link)
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
@@ -105,7 +133,11 @@ class SwerveController(Node):
             JointState,
             joint_state_topic,
             self.joint_states_callback,
-            10
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                durability=DurabilityPolicy.VOLATILE,
+                depth=10)
         )
 
         self.get_logger().info(
@@ -122,7 +154,11 @@ class SwerveController(Node):
             Twist,
             twist_topic,
             self.cmd_vel_callback,
-            10)
+            QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                history=HistoryPolicy.KEEP_LAST,
+                durability=DurabilityPolicy.VOLATILE,
+                depth=10))
         self.get_logger().info(
             f'Listening for movement commands on topic "{twist_topic}"'
         )
@@ -310,9 +346,9 @@ class SwerveController(Node):
         if msg == None:
             return
 
-        self.get_logger().debug(
-            f'Received a JointState message: "{msg}"'
-        )
+        # self.get_logger().debug(
+        #     f'Received a JointState message: "{msg}"'
+        # )
 
         # It would be better if we stored this message and processed it during our own timer loop. That way
         # we wouldn't be blocking the callback.
@@ -341,23 +377,23 @@ class SwerveController(Node):
                 )
                 measured_drive_states.append(value)
 
-                self.get_logger().info(
-                    f'Updating joint states for: "{drive_module.name}" with: ' +
-                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
-                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
-                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
-                )
+                # self.get_logger().info(
+                #     f'Updating joint states for: "{drive_module.name}" with: ' +
+                #     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                #     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                #     f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
+                # )
             else:
                 # grab the previous state and just assume that's the one
                 value = self.last_drive_module_state[index]
                 measured_drive_states.append(value)
 
-                self.get_logger().debug(
-                    f'Updating joint states for: "{drive_module.name}" with: ' +
-                    f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
-                    f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
-                    f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
-                )
+                # self.get_logger().debug(
+                #     f'Updating joint states for: "{drive_module.name}" with: ' +
+                #     f'[ steering angle: "{value.orientation_in_body_coordinates.z}", ' +
+                #     f' steering velocity: "{value.orientation_velocity_in_body_coordinates.z}",' +
+                #     f' velocity: "{value.drive_velocity_in_module_coordinates.x}" ] '
+                # )
 
         # Ideally we would get the time from the message. And then check if we have gotten a more
         # recent message
@@ -370,6 +406,8 @@ class SwerveController(Node):
 
         msg = Odometry()
         msg.header.stamp = self.last_recorded_time.to_msg()
+        msg.header.frame_id = "odom"
+        msg.child_frame_id = "base_footprint"
         msg.pose.pose.position.x = body_state.position_in_world_coordinates.x
         msg.pose.pose.position.y = body_state.position_in_world_coordinates.y
         msg.pose.pose.position.z = body_state.position_in_world_coordinates.z
@@ -390,11 +428,30 @@ class SwerveController(Node):
 
         # For now we ignore the covariances
 
-        self.get_logger().info(
-            'Publishing odometry message {}'.format(msg)
-        )
+        # self.get_logger().info(
+        #     'Publishing odometry message {}'.format(msg)
+        # )
 
         self.odometry_publisher.publish(msg)
+
+    def send_odom_transform(self, robot_base_link: str):
+        tf_static_broadcaster = StaticTransformBroadcaster(self)
+        transform = TransformStamped()
+        transform.header.stamp = self.get_clock().now().to_msg()
+        transform.header.frame_id = "odom"
+        transform.child_frame_id = robot_base_link
+
+        transform.transform.translation.x = 0.0
+        transform.transform.translation.y = 0.0
+        transform.transform.translation.z = 0.0
+
+        quat = quaternion_from_euler(0.0, 0.0, 0.0)
+        transform.transform.rotation.x = quat[0]
+        transform.transform.rotation.y = quat[1]
+        transform.transform.rotation.z = quat[2]
+        transform.transform.rotation.w = quat[3]
+
+        tf_static_broadcaster.sendTransform(transform)
 
     def store_time_and_update_controller_time(self):
         time: Time = self.get_clock().now()
@@ -411,29 +468,29 @@ class SwerveController(Node):
         # Check if we actually have a movement profile to send
         current_time = self.get_clock().now()
         trajectory_running_duration: TimeDuration = current_time - self.last_velocity_command_received_at
-        self.get_logger().debug(
-            'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
-                trajectory_running_duration,
-                current_time,
-                self.last_velocity_command_received_at
-            )
-        )
+        # self.get_logger().debug(
+        #     'Current trajectory duration {} s. Based on current time {} and sequence start time {}'.format(
+        #         trajectory_running_duration,
+        #         current_time,
+        #         self.last_velocity_command_received_at
+        #     )
+        # )
 
         running_duration_as_float: float = trajectory_running_duration.nanoseconds * 1e-9
-        self.get_logger().debug(
-            'Current trajectory duration {} s'.format(running_duration_as_float)
-        )
+        # self.get_logger().debug(
+        #     'Current trajectory duration {} s'.format(running_duration_as_float)
+        # )
 
         if running_duration_as_float > self.controller.min_time_for_profile:
-            self.get_logger().debug(
-                'Trajectory completed waiting for next command.'
-            )
+            # self.get_logger().debug(
+            #     'Trajectory completed waiting for next command.'
+            # )
             return
 
         next_time_step = current_time.nanoseconds * 1e-9 + 1.0 / self.cycle_time_in_hertz
-        self.get_logger().debug(
-            'Calculating next step in profile at time {} s'.format(next_time_step)
-        )
+        # self.get_logger().debug(
+        #     'Calculating next step in profile at time {} s'.format(next_time_step)
+        # )
 
         drive_module_states = self.controller.drive_module_state_at_future_time(next_time_step)
 
@@ -459,10 +516,10 @@ class SwerveController(Node):
         # Publish the next steering angle and the next velocity sets. Note that
         # The velocity is published (very) shortly after the position data, which means
         # that the velocity could lag in very tight update loops.
-        self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
+        #self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
         self.drive_module_steering_angle_publisher.publish(position_msg)
 
-        self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
+        #self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
         self.drive_module_velocity_publisher.publish(velocity_msg)
 
         self.last_control_update_send_at = self.last_recorded_time

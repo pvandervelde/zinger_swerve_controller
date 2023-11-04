@@ -1,6 +1,8 @@
 swerve_controller:
   ros__parameters:
 
+    robot_base_frame: base_footprint
+
     twist_topic: cmd_vel
 
     position_controller_name: "drive_module_steering_angle_controller"

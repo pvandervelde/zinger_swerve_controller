@@ -157,94 +157,94 @@ class ModuleFollowsBodySteeringController():
                     if abs(first_state_velocity_difference) <= abs(second_state_velocity_difference):
                         # first rotation and velocity change are the smallest, so take the first state
                         result.append(states_for_module[0])
-                        self.logger(
-                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
-                                self.modules[i].name,
-                                current_steering_angle,
-                                current_velocity,
-                                states_for_module[0].steering_angle_in_radians,
-                                states_for_module[0].drive_velocity_in_meters_per_second,
-                                states_for_module[1].steering_angle_in_radians,
-                                states_for_module[1].drive_velocity_in_meters_per_second
-                            )
-                        )
+                        # self.logger(
+                        #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
+                        #         self.modules[i].name,
+                        #         current_steering_angle,
+                        #         current_velocity,
+                        #         states_for_module[0].steering_angle_in_radians,
+                        #         states_for_module[0].drive_velocity_in_meters_per_second,
+                        #         states_for_module[1].steering_angle_in_radians,
+                        #         states_for_module[1].drive_velocity_in_meters_per_second
+                        #     )
+                        # )
                     else:
                         if math.isclose(abs(first_state_rotation_difference), abs(second_state_rotation_difference), rel_tol=1e-7, abs_tol=1e-7):
                             # first rotation is equal to the second rotation
                             # first velocity larger than the second velocity.
                             # pick the second state
                             result.append(states_for_module[1])
-                            self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
-                                    self.modules[i].name,
-                                    current_steering_angle,
-                                    current_velocity,
-                                    states_for_module[0].steering_angle_in_radians,
-                                    states_for_module[0].drive_velocity_in_meters_per_second,
-                                    states_for_module[1].steering_angle_in_radians,
-                                    states_for_module[1].drive_velocity_in_meters_per_second
-                                )
-                            )
+                            # self.logger(
+                            #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
+                            #         self.modules[i].name,
+                            #         current_steering_angle,
+                            #         current_velocity,
+                            #         states_for_module[0].steering_angle_in_radians,
+                            #         states_for_module[0].drive_velocity_in_meters_per_second,
+                            #         states_for_module[1].steering_angle_in_radians,
+                            #         states_for_module[1].drive_velocity_in_meters_per_second
+                            #     )
+                            # )
                         else:
                             # first rotation is the smallest but second velocity is the smallest
                             result.append(states_for_module[0])
-                            self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
-                                    self.modules[i].name,
-                                    current_steering_angle,
-                                    current_velocity,
-                                    states_for_module[0].steering_angle_in_radians,
-                                    states_for_module[0].drive_velocity_in_meters_per_second,
-                                    states_for_module[1].steering_angle_in_radians,
-                                    states_for_module[1].drive_velocity_in_meters_per_second
-                                )
-                            )
+                            # self.logger(
+                            #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
+                            #         self.modules[i].name,
+                            #         current_steering_angle,
+                            #         current_velocity,
+                            #         states_for_module[0].steering_angle_in_radians,
+                            #         states_for_module[0].drive_velocity_in_meters_per_second,
+                            #         states_for_module[1].steering_angle_in_radians,
+                            #         states_for_module[1].drive_velocity_in_meters_per_second
+                            #     )
+                            # )
                 else:
                     if abs(second_state_velocity_difference) <= abs(first_state_velocity_difference):
                         # second rotation and velocity change are the smallest, so take the second state
                         result.append(states_for_module[1])
-                        self.logger(
-                            'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
-                                self.modules[i].name,
-                                current_steering_angle,
-                                current_velocity,
-                                states_for_module[0].steering_angle_in_radians,
-                                states_for_module[0].drive_velocity_in_meters_per_second,
-                                states_for_module[1].steering_angle_in_radians,
-                                states_for_module[1].drive_velocity_in_meters_per_second
-                            )
-                        )
+                        # self.logger(
+                        #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
+                        #         self.modules[i].name,
+                        #         current_steering_angle,
+                        #         current_velocity,
+                        #         states_for_module[0].steering_angle_in_radians,
+                        #         states_for_module[0].drive_velocity_in_meters_per_second,
+                        #         states_for_module[1].steering_angle_in_radians,
+                        #         states_for_module[1].drive_velocity_in_meters_per_second
+                        #     )
+                        # )
                     else:
                         if math.isclose(abs(first_state_rotation_difference), abs(second_state_rotation_difference), rel_tol=1e-7, abs_tol=1e-7):
                             # second rotation is equal to the first rotation
                             # second velocity larger than the first velocity.
                             # pick the first state
                             result.append(states_for_module[0])
-                            self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
-                                    self.modules[i].name,
-                                    current_steering_angle,
-                                    current_velocity,
-                                    states_for_module[0].steering_angle_in_radians,
-                                    states_for_module[0].drive_velocity_in_meters_per_second,
-                                    states_for_module[1].steering_angle_in_radians,
-                                    states_for_module[1].drive_velocity_in_meters_per_second
-                                )
-                            )
+                            # self.logger(
+                            #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 1'.format(
+                            #         self.modules[i].name,
+                            #         current_steering_angle,
+                            #         current_velocity,
+                            #         states_for_module[0].steering_angle_in_radians,
+                            #         states_for_module[0].drive_velocity_in_meters_per_second,
+                            #         states_for_module[1].steering_angle_in_radians,
+                            #         states_for_module[1].drive_velocity_in_meters_per_second
+                            #     )
+                            # )
                         else:
                             # second rotation is the smallest but first velocity is the smallest
                             result.append(states_for_module[1])
-                            self.logger(
-                                'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
-                                    self.modules[i].name,
-                                    current_steering_angle,
-                                    current_velocity,
-                                    states_for_module[0].steering_angle_in_radians,
-                                    states_for_module[0].drive_velocity_in_meters_per_second,
-                                    states_for_module[1].steering_angle_in_radians,
-                                    states_for_module[1].drive_velocity_in_meters_per_second
-                                )
-                            )
+                            # self.logger(
+                            #     'module: {} - current state [{} rad, {} m/s]. Options - 1) [{} rad, {} m/s] - 2) [{} rad, {} m/s]. Selected option 2'.format(
+                            #         self.modules[i].name,
+                            #         current_steering_angle,
+                            #         current_velocity,
+                            #         states_for_module[0].steering_angle_in_radians,
+                            #         states_for_module[0].drive_velocity_in_meters_per_second,
+                            #         states_for_module[1].steering_angle_in_radians,
+                            #         states_for_module[1].drive_velocity_in_meters_per_second
+                            #     )
+                            # )
         else:
             for drive_module in self.modules:
                 state = self.module_profile_from_command.value_for_module_at(drive_module.name, time_fraction)
@@ -263,9 +263,9 @@ class ModuleFollowsBodySteeringController():
             return []
 
         time_from_start_of_profile = future_time_in_seconds - self.profile_was_started_at_time_in_seconds
-        self.logger(
-            'Determining profile values at {}'.format(time_from_start_of_profile)
-        )
+        # self.logger(
+        #     'Determining profile values at {}'.format(time_from_start_of_profile)
+        # )
 
         profile_time = self.body_profile.time_span() if self.is_executing_body_profile else self.module_profile_from_command.time_span()
         time_fraction = time_from_start_of_profile / profile_time
@@ -361,16 +361,16 @@ class ModuleFollowsBodySteeringController():
 
          # Calculate the current body state
         body_motion = self.control_model.body_motion_from_wheel_module_states(self.module_states)
-        self.logger(
-            'Body motion: linear [{}, {}, {}]; rotation [{}, {}, {}]'.format(
-                body_motion.linear_velocity.x,
-                body_motion.linear_velocity.y,
-                body_motion.linear_velocity.z,
-                body_motion.angular_velocity.x,
-                body_motion.angular_velocity.y,
-                body_motion.angular_velocity.z,
-            )
-        )
+        # self.logger(
+        #     'Body motion: linear [{}, {}, {}]; rotation [{}, {}, {}]'.format(
+        #         body_motion.linear_velocity.x,
+        #         body_motion.linear_velocity.y,
+        #         body_motion.linear_velocity.z,
+        #         body_motion.angular_velocity.x,
+        #         body_motion.angular_velocity.y,
+        #         body_motion.angular_velocity.z,
+        #     )
+        # )
 
         time_step_in_seconds = self.current_time_in_seconds - self.last_state_update_time
         # self.logger(
@@ -417,16 +417,16 @@ class ModuleFollowsBodySteeringController():
             orientation_jerk
         )
 
-        self.logger(
-            'position: [{}, {}, {}] orientation [[{}, {}, {}]]'.format(
-                self.body_state.position_in_world_coordinates.x,
-                self.body_state.position_in_world_coordinates.y,
-                self.body_state.position_in_world_coordinates.z,
-                self.body_state.orientation_in_world_coordinates.x,
-                self.body_state.orientation_in_world_coordinates.y,
-                self.body_state.orientation_in_world_coordinates.z,
-            )
-        )
+        # self.logger(
+        #     'position: [{}, {}, {}] orientation [[{}, {}, {}]]'.format(
+        #         self.body_state.position_in_world_coordinates.x,
+        #         self.body_state.position_in_world_coordinates.y,
+        #         self.body_state.position_in_world_coordinates.z,
+        #         self.body_state.orientation_in_world_coordinates.x,
+        #         self.body_state.orientation_in_world_coordinates.y,
+        #         self.body_state.orientation_in_world_coordinates.z,
+        #     )
+        # )
 
         self.last_state_update_time = self.current_time_in_seconds
 
