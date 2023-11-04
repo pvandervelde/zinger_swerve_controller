@@ -186,6 +186,12 @@ class SwerveController(Node):
             f'Received a Twist message that is different from the last command. Processing message: "{msg}"'
         )
 
+        # When we get a stream of command it is possible that each command is slightly different (looking at you ROS2 nav)
+        # This means we reset the starting time of the change profile each time, which starts the process all over
+        # Because we don't take the current steering velocity / drive acceleration into account we assume that we
+        # start from rest. That is wrong. We should be starting from a place where we have the current
+        # steering velocity / drive acceleration.
+
         self.store_time_and_update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
