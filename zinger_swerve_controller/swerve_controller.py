@@ -31,7 +31,7 @@ from tf_transformations import quaternion_from_euler
 from .control import BodyMotionCommand
 from .drive_module import DriveModule
 from .geometry import Point
-from .profile import SingleVariableSCurveProfile, TransientVariableProfile
+from .profile import SingleVariableLinearProfile, SingleVariableSCurveProfile, TransientVariableProfile
 from .states import DriveModuleMeasuredValues
 from .steering_controller import DriveModuleDesiredValuesProfilePoint, ModuleFollowsBodySteeringController
 
@@ -108,7 +108,7 @@ class SwerveController(Node):
         # registered
         self.get_logger().info(f'Storing drive module information...')
         self.drive_modules = self.get_drive_modules()
-        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile, self.write_log)
+        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_motion_profile, self.write_log)
 
         # initialize the time tracking variables after we get the controller up and running
         # so that we can initialize the controller at the same time.
@@ -334,8 +334,10 @@ class SwerveController(Node):
 
         return drive_modules
 
-    def get_scurve_profile(self, start: float, end: float) -> TransientVariableProfile:
-        return SingleVariableSCurveProfile(start, end)
+    def get_motion_profile(self, start: float, end: float) -> TransientVariableProfile:
+        # return SingleVariableSCurveProfile(start, end)
+
+        return SingleVariableLinearProfile(start, end)
 
     def initialize_drive_module_states(self, drive_modules: List[DriveModule]) -> List[DriveModuleMeasuredValues]:
         measured_drive_states: List[DriveModuleMeasuredValues] = []
