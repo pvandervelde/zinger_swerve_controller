@@ -31,7 +31,7 @@ from tf_transformations import quaternion_from_euler
 from .control import BodyMotionCommand
 from .drive_module import DriveModule
 from .geometry import Point
-from .profile import SingleVariableSCurveProfile, TransientVariableProfile
+from .profile import SingleVariableLinearProfile, SingleVariableSCurveProfile, TransientVariableProfile
 from .states import DriveModuleMeasuredValues
 from .steering_controller import DriveModuleDesiredValuesProfilePoint, ModuleFollowsBodySteeringController
 
@@ -50,6 +50,8 @@ class SwerveController(Node):
         self.declare_parameter("drive_joints", ["joint1", "joint2"])
 
         self.get_logger().info(f'Initializing swerve controller ...')
+
+        self.last_velocity_command: Twist = None
 
         robot_base_link = self.get_parameter("robot_base_frame").value
 
@@ -106,7 +108,7 @@ class SwerveController(Node):
         # registered
         self.get_logger().info(f'Storing drive module information...')
         self.drive_modules = self.get_drive_modules()
-        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_scurve_profile, self.write_log)
+        self.controller = ModuleFollowsBodySteeringController(self.drive_modules, self.get_motion_profile, self.write_log)
 
         # initialize the time tracking variables after we get the controller up and running
         # so that we can initialize the controller at the same time.
@@ -167,20 +169,40 @@ class SwerveController(Node):
         if msg == None:
             return
 
+        # If this twist message is the same as last time, then we don't need to do anything
+        if self.last_velocity_command is not None:
+            if msg.linear.x == self.last_velocity_command.linear.x and \
+                msg.linear.y == self.last_velocity_command.linear.y and \
+                msg.angular.z == self.last_velocity_command.angular.z:
+
+                # The last command was the same as the current command. So just ignore it and move on.
+                self.get_logger().info(
+                    f'Received a Twist message that is the same as the last message. Taking no action. Message was: "{msg}"'
+                )
+
+                return
+
         self.get_logger().info(
-            f'Received a Twist message: "{msg}"'
+            f'Received a Twist message that is different from the last command. Processing message: "{msg}"'
         )
+
+        # When we get a stream of command it is possible that each command is slightly different (looking at you ROS2 nav)
+        # This means we reset the starting time of the change profile each time, which starts the process all over
+        # Because we don't take the current steering velocity / drive acceleration into account we assume that we
+        # start from rest. That is wrong. We should be starting from a place where we have the current
+        # steering velocity / drive acceleration.
 
         self.store_time_and_update_controller_time()
         self.controller.on_desired_state_update(
             BodyMotionCommand(
-                2.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
+                1.0, # THIS SHOULD REALLY BE CALCULATED SOME HOW
                 msg.linear.x,
                 msg.linear.y,
                 msg.angular.z
             )
         )
 
+        self.last_velocity_command = msg
         self.last_velocity_command_received_at = self.last_recorded_time
 
     def get_drive_modules(self) -> List[DriveModule]:
@@ -312,8 +334,10 @@ class SwerveController(Node):
 
         return drive_modules
 
-    def get_scurve_profile(self, start: float, end: float) -> TransientVariableProfile:
-        return SingleVariableSCurveProfile(start, end)
+    def get_motion_profile(self, start: float, end: float) -> TransientVariableProfile:
+        # return SingleVariableSCurveProfile(start, end)
+
+        return SingleVariableLinearProfile(start, end)
 
     def initialize_drive_module_states(self, drive_modules: List[DriveModule]) -> List[DriveModuleMeasuredValues]:
         measured_drive_states: List[DriveModuleMeasuredValues] = []

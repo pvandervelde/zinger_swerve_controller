@@ -33,6 +33,204 @@ class TransientVariableProfile(ABC):
     def value_at(self, time_fraction: float) -> float:
         pass
 
+class SingleVariableLinearProfile(TransientVariableProfile):
+
+    def __init__(self, start: float, end: float):
+        self.start = start
+        self.end = end
+
+    def first_derivative_at(self, time_fraction: float) -> float:
+        return self.end - self.start
+
+    def second_derivative_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return 0.0
+
+        if time_fraction > 1.0:
+            return 0.0
+
+        if math.isclose(0.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            return (self.end - self.start) / 0.01
+
+        if math.isclose(1.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            return -(self.end - self.start) / 0.01
+
+        return 0.0
+
+    def third_derivative_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return 0.0
+
+        if time_fraction > 1.0:
+            return 0.0
+
+        if math.isclose(0.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            return (self.end - self.start) / 0.01 / 0.01
+
+        if math.isclose(1.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            return -(self.end - self.start) / 0.01 / 0.01
+
+        return 0.0
+
+    def value_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return self.start
+
+        if time_fraction > 1.0:
+            return self.end
+
+        return (self.end - self.start) * time_fraction + self.start
+
+# see: https://www.mathworks.com/help/robotics/ug/design-a-trajectory-with-velocity-limits-using-a-trapezoidal-velocity-profile.html
+class SingleVariableTrapezoidalProfile(TransientVariableProfile):
+
+
+    def __init__(self, start: float, end: float):
+        self.start = start
+        self.end = end
+
+        # For a trapezoidal motion profile the progress in the profile
+        # is based on the first derrivative, e.g. if the profile is
+        # for position then the progress from one position to another
+        # is based on the velocity profile
+        #
+        # The two extremes are:
+        # - Constant velocity over the entire time span
+        # - Constant acceleration over half the timespan and constant decleration over
+        #   the other half of the timespan
+        #
+        # In the first case the velocity is (endValue - startValue) / timeSpan
+        # In the second case the velocity_max is 2 * ((endValue - startValue) / timeSpan)
+        # The actual velocity should be in between these values
+        #
+        # Initially assume that all phases take 1/3 of the total time
+        #
+        # Profiles are always defined on a relative time span of 1.0, which makes
+        # it easy to alter the timespan.
+        #
+        # v_min = (end - start) / 1.0
+        # v_max = 2 * v_min
+        #
+        # Assume the profile is 1/3rd acceleration, 1/3 constant velocity and
+        # 1/3rd deceleration
+        #
+        # The total distance is equal to the integral of velocity over time. For
+        # a trapezoidal profile this means
+        #
+        # s = 0.5 * v * t_acc + v * t_const + 0.5 * v * t_dec
+        #
+        # where:
+        # - s = distance
+        # - v = maximum velocity in the profile
+        # - t_acc = time taken to accelerate
+        # - t_const = time taken at constant velocity
+        # - t_dec = time taken to decelerate
+        #
+        # s = v * (0.5 * t_acc + t_const + 0.5 * t_dec)
+        #
+        # Each segment is 1/3 of the total time
+        #
+        # s = v * 2/3 * t
+        #
+        # v = 1.5 * s / t
+        self.velocity = 1.5 * (end - start) / 1.0
+
+        self.acceleration_phase_ratio = 1/3
+        self.constant_phase_ratio = 1/3
+        self.deceleration_phase_ratio = 1/3
+
+    def first_derivative_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return 0.0
+
+        if time_fraction > 1.0:
+            return 0.0
+
+        if time_fraction < self.acceleration_phase_ratio:
+            # Accelerating
+            starting_velocity = 0.0
+            velocity_due_to_acceleration = ((self.velocity - starting_velocity) / self.acceleration_phase_ratio) * time_fraction
+            return starting_velocity + velocity_due_to_acceleration
+
+        if time_fraction > (self.acceleration_phase_ratio + self.constant_phase_ratio):
+            # deccelerating
+            starting_velocity = self.velocity
+            ending_velocity = 0.0
+            velocity_due_to_acceleration = ((ending_velocity - self.velocity) / self.deceleration_phase_ratio) * (time_fraction - (self.acceleration_phase_ratio + self.constant_phase_ratio))
+            return starting_velocity + velocity_due_to_acceleration
+
+        return self.velocity
+
+    def second_derivative_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return 0.0
+
+        if time_fraction > 1.0:
+            return 0.0
+
+        if time_fraction < self.acceleration_phase_ratio:
+            # Accelerating
+            starting_velocity = 0.0
+            return (self.velocity - starting_velocity) / self.acceleration_phase_ratio
+
+        if time_fraction > (self.acceleration_phase_ratio + self.constant_phase_ratio):
+            # deccelerating
+            ending_velocity = 0.0
+            return (ending_velocity - self.velocity) / self.deceleration_phase_ratio
+
+        return 0.0
+
+    def third_derivative_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return 0.0
+
+        if time_fraction > 1.0:
+            return 0.0
+
+        if math.isclose(0.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            starting_velocity = 0.0
+            return (((self.velocity - starting_velocity) / self.acceleration_phase_ratio) - 0.0) / 0.01
+
+        if math.isclose(time_fraction, self.acceleration_phase_ratio, rel_tol=1e-2, abs_tol=1e-2):
+            starting_velocity = 0.0
+            return (0.0 - ((self.velocity - starting_velocity) / self.acceleration_phase_ratio)) / 0.01
+
+        if math.isclose(time_fraction, self.acceleration_phase_ratio + self.constant_phase_ratio, rel_tol=1e-2, abs_tol=1e-2):
+            ending_velocity = 0.0
+            return (((ending_velocity - self.velocity) / self.deceleration_phase_ratio) - 0.0) / 0.01
+
+        if math.isclose(1.0, time_fraction, rel_tol=1e-2, abs_tol=1e-2):
+            ending_velocity = 0.0
+            return (0.0 - ((ending_velocity - self.velocity) / self.acceleration_phase_ratio)) / 0.01
+
+        return 0.0
+
+    def value_at(self, time_fraction: float) -> float:
+        if time_fraction < 0.0:
+            return self.start
+
+        if time_fraction > 1.0:
+            return self.end
+
+        if time_fraction < self.acceleration_phase_ratio:
+            # Accelerating
+            starting_velocity = 0.0
+            distance_change_from_velocity = starting_velocity * time_fraction
+            distance_change_from_acceleration = 0.5 * ((self.velocity - starting_velocity) / self.acceleration_phase_ratio) * time_fraction * time_fraction
+            return self.start + distance_change_from_velocity + distance_change_from_acceleration
+
+        distance_due_to_inital_acceleration = 0.5 * self.velocity * self.acceleration_phase_ratio
+        if time_fraction > (self.acceleration_phase_ratio + self.constant_phase_ratio):
+            # deccelerating
+            distance_due_to_constant_velocity = self.velocity * self.constant_phase_ratio
+
+            deceleration_time = time_fraction - (self.acceleration_phase_ratio + self.constant_phase_ratio)
+            ending_velocity = 0.0
+            distance_due_to_deceleration = self.velocity * deceleration_time + 0.5 * ((ending_velocity - self.velocity) / self.deceleration_phase_ratio) * deceleration_time * deceleration_time
+            return self.start + distance_due_to_inital_acceleration + distance_due_to_constant_velocity + distance_due_to_deceleration
+
+        return self.start + distance_due_to_inital_acceleration + (time_fraction - self.acceleration_phase_ratio) * self.velocity
+
 # S-Curve profile
 # --> controlled by the second derivative being linear
 class SingleVariableSCurveProfile(TransientVariableProfile):
