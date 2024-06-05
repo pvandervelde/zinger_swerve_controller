@@ -11,6 +11,7 @@
 # limitations under the License.
 
 from typing import List
+import math
 import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
@@ -18,6 +19,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from tf2_geometry_msgs import TransformStamped
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
+import tf2_ros
 
 from builtin_interfaces.msg import Duration as MsgDuration
 from geometry_msgs.msg import Twist
@@ -53,7 +55,7 @@ class SwerveController(Node):
 
         self.last_velocity_command: Twist = None
 
-        robot_base_link = self.get_parameter("robot_base_frame").value
+        self.robot_base_link = self.get_parameter("robot_base_frame").value
 
         # publish the module steering angle
         position_controller_name = self.get_parameter("position_controller_name").value
@@ -101,7 +103,24 @@ class SwerveController(Node):
             f'Publishing odometry information on topic "{odom_topic}"'
         )
 
-        self.send_odom_transform(robot_base_link)
+        # Define TF broadcaster
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+
+        # Initialize odom tf
+        zero_odometry = Odometry()
+        zero_odometry.header.stamp = self.get_clock().now().to_msg()
+        zero_odometry.header.frame_id = "odom"
+        zero_odometry.child_frame_id = self.robot_base_link
+        zero_odometry.pose.pose.position.x = 0.0
+        zero_odometry.pose.pose.position.y = 0.0
+        zero_odometry.pose.pose.position.z = 0.0
+        quat = quaternion_from_euler(0.0, 0.0, 0.0)
+        zero_odometry.pose.pose.orientation.x = quat[0]
+        zero_odometry.pose.pose.orientation.y = quat[1]
+        zero_odometry.pose.pose.orientation.z = quat[2]
+        zero_odometry.pose.pose.orientation.w = quat[3]
+        self.send_odom_transform(zero_odometry)
+        # self.send_static_tf()
 
         # Create the controller that will determine the correct drive commands for the different drive modules
         # Create the controller before we subscribe to state changes so that the first change that comes in gets
@@ -431,7 +450,7 @@ class SwerveController(Node):
         msg = Odometry()
         msg.header.stamp = self.last_recorded_time.to_msg()
         msg.header.frame_id = "odom"
-        msg.child_frame_id = "base_footprint"
+        msg.child_frame_id = self.robot_base_link
         msg.pose.pose.position.x = body_state.position_in_world_coordinates.x
         msg.pose.pose.position.y = body_state.position_in_world_coordinates.y
         msg.pose.pose.position.z = body_state.position_in_world_coordinates.z
@@ -450,6 +469,8 @@ class SwerveController(Node):
         msg.twist.twist.angular.y = body_state.motion_in_body_coordinates.angular_velocity.y
         msg.twist.twist.angular.z = body_state.motion_in_body_coordinates.angular_velocity.z
 
+        self.send_odom_transform(msg)
+
         # For now we ignore the covariances
 
         # self.get_logger().info(
@@ -458,23 +479,34 @@ class SwerveController(Node):
 
         self.odometry_publisher.publish(msg)
 
-    def send_odom_transform(self, robot_base_link: str):
+    def send_odom_transform(self, odometry_msg: Odometry):
+        transform = TransformStamped()
+        transform.header.stamp = odometry_msg.header.stamp
+        transform.header.frame_id = "odom"
+        transform.child_frame_id = self.robot_base_link
+        transform.transform.translation.x = odometry_msg.pose.pose.position.x
+        transform.transform.translation.y = odometry_msg.pose.pose.position.y
+        transform.transform.translation.z = odometry_msg.pose.pose.position.z
+        transform.transform.rotation.x = odometry_msg.pose.pose.orientation.x
+        transform.transform.rotation.y = odometry_msg.pose.pose.orientation.y
+        transform.transform.rotation.z = odometry_msg.pose.pose.orientation.z
+        transform.transform.rotation.w = odometry_msg.pose.pose.orientation.w
+        self.tf_broadcaster.sendTransform(transform)
+
+    def send_static_tf(self):
         tf_static_broadcaster = StaticTransformBroadcaster(self)
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
         transform.header.frame_id = "odom"
-        transform.child_frame_id = robot_base_link
-
+        transform.child_frame_id = self.robot_base_link
         transform.transform.translation.x = 0.0
         transform.transform.translation.y = 0.0
         transform.transform.translation.z = 0.0
-
         quat = quaternion_from_euler(0.0, 0.0, 0.0)
         transform.transform.rotation.x = quat[0]
         transform.transform.rotation.y = quat[1]
         transform.transform.rotation.z = quat[2]
         transform.transform.rotation.w = quat[3]
-
         tf_static_broadcaster.sendTransform(transform)
 
     def store_time_and_update_controller_time(self):
@@ -537,16 +569,18 @@ class SwerveController(Node):
         velocity_msg = Float64MultiArray()
         velocity_msg.data = drive_velocity_values
 
-        # Publish the next steering angle and the next velocity sets. Note that
-        # The velocity is published (very) shortly after the position data, which means
-        # that the velocity could lag in very tight update loops.
-        #self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
-        self.drive_module_steering_angle_publisher.publish(position_msg)
+        # if there are some inf values in data avoid Publishing message
+        if not (any(math.isinf(x) for x in position_msg.data)) and not (any(math.isinf(y) for y in velocity_msg.data)): 
+            # Publish the next steering angle and the next velocity sets. Note that
+            # The velocity is published (very) shortly after the position data, which means
+            # that the velocity could lag in very tight update loops.
+            #self.get_logger().info(f'Publishing steering angle data: "{position_msg}"')
+            self.drive_module_steering_angle_publisher.publish(position_msg)
 
-        #self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
-        self.drive_module_velocity_publisher.publish(velocity_msg)
+            #self.get_logger().info(f'Publishing velocity angle data: "{velocity_msg}"')
+            self.drive_module_velocity_publisher.publish(velocity_msg)
 
-        self.last_control_update_send_at = self.last_recorded_time
+            self.last_control_update_send_at = self.last_recorded_time
 
     def write_log(self, text: str):
         self.get_logger().info(text)
