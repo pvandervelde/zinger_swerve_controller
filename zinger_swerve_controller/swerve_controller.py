@@ -11,6 +11,7 @@
 # limitations under the License.
 
 from typing import List
+import math
 import rclpy
 from rclpy.clock import Clock, Time
 from rclpy.duration import Duration as TimeDuration
@@ -134,6 +135,9 @@ class SwerveController(Node):
         self.store_time_and_update_controller_time()
         self.last_control_update_send_at = self.last_recorded_time
         self.last_velocity_command_received_at = self.last_recorded_time
+
+        # keep last position message to avoid inf value in steering angle data
+        self.last_position_msg: Float64MultiArray = None
 
         # Create the timer that is used to ensure that we publish movement data regularly
         self.cycle_time_in_hertz = self.get_parameter("cycle_fequency").value
@@ -568,6 +572,12 @@ class SwerveController(Node):
 
         velocity_msg = Float64MultiArray()
         velocity_msg.data = drive_velocity_values
+
+        # if there are some inf values in data publish last position instead (or update last position message)
+        if (any(math.isinf(x) for x in position_msg.data)) and not (self.last_position_msg is None):
+            position_msg = self.last_position_msg
+        else:
+            self.last_position_msg = position_msg
 
         # Publish the next steering angle and the next velocity sets. Note that
         # The velocity is published (very) shortly after the position data, which means
