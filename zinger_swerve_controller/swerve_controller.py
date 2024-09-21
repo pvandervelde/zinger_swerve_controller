@@ -108,7 +108,7 @@ class SwerveController(Node):
 
         # Initialize odom TF 
         zero_odometry = Odometry()
-        zero_odometry.header.stamp = self.get_clock.now().to_msg()
+        zero_odometry.header.stamp = self.get_clock().now().to_msg()
         zero_odometry.header.frame_id = "odom"
         zero_odometry.child_frame_id = self.robot_base_link
         zero_odometry.pose.pose.position.x = 0.0
